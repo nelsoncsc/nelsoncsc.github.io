@@ -1,1 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+		}
+<rss version="2.0" xmlns:ror="http://rorweb.com/0.1/" >
+<channel>
+  <title>ROR Sitemap for http://sistenix.com/</title>
+  <link>http://sistenix.com/</link>
 
+<item>
+     <link>https://sistenix.com/</link>
+     <title>sistenix.com - Building ideas</title>
+     <description>sistenix.com - Building ideas for hardware design</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>0</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/index.html</link>
+     <title>sistenix.com - Building ideas</title>
+     <description>sistenix.com - Building ideas for hardware design</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>1</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/about.html</link>
+     <title>Nelson Campos</title>
+     <description>Nelson Campos</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>1</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/blog.html</link>
+     <title>sistenix.com - Building ideas for Hardware design</title>
+     <description>sistenix.com - Building ideas for hardware design</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>1</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/peasant.html</link>
+     <title>Peasant Multiplication</title>
+     <description>sistenix.com - Hardware Division</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/fft.html</link>
+     <title>Fixed Point Recursive FFT</title>
+     <description>sistenix.com - Fixed Point Recursive FFT</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/isp_uvm.html</link>
+     <title>UVM Environment for Image Signal Processing</title>
+     <description>sistenix.com - A basic tutorial of UVM</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/integral.html</link>
+     <title>Integral Image in Hardware</title>
+     <description>sistenix.com - Integral Image in Hardware</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/sobel.html</link>
+     <title>2D Convolution in Hardware</title>
+     <description>sistenix.com - 2D Convolution in Hardware</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/basic_uvmc_oct.html</link>
+     <title>A Basic Tutorial to Connect Octave with UVM</title>
+     <description>sistenix.com - A basic tutorial of UVM Connect</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/basic_uvmc.html</link>
+     <title>A basic tutorial of UVM Connect</title>
+     <description>sistenix.com - A basic tutorial of UVM Connect</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/basic_uvm.html</link>
+     <title>A Basic Tutorial of UVM</title>
+     <description>sistenix.com - A basic tutorial of UVM</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/dc_shell.html</link>
+     <title>Hardware Synthesis</title>
+     <description>sistenix.com - Hardware Synthesis</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/rgb2ycbcr.html</link>
+     <title>RGB to YCbCr conversion</title>
+     <description>sistenix.com - Hardware Division</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/amba.html</link>
+     <title>AMBA AXI Protocol</title>
+     <description>sistenix.com - AMBA AXI Protocol</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/logarithm.html</link>
+     <title>Logarithm Computation</title>
+     <description>sistenix.com - Binary Logarithm Algorithm</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/sqrt.html</link>
+     <title>Square Root Computation</title>
+     <description>sistenix.com - Square Root Computation</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/division.html</link>
+     <title>Hardware Division</title>
+     <description>sistenix.com - Hardware Division</description>
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>2</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+<item>
+     <link>https://sistenix.com/nelson_framework.pdf</link>
+     <title></title>
+     
+     <ror:updatePeriod></ror:updatePeriod>
+     <ror:sortOrder>3</ror:sortOrder>
+     <ror:resourceOf>sitemap</ror:resourceOf>
+</item>
+</channel>
+</rss>
+  
