@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:xhtml="http://www.w3.org/1999/xhtml"
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="403px"
+   height="268px"
+   version="1.1"
+   content="&lt;mxfile userAgent=&quot;Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.90 Safari/537.36&quot; version=&quot;6.0.1.7&quot; editor=&quot;www.draw.io&quot; type=&quot;google&quot;&gt;&lt;diagram name=&quot;Page-1&quot;&gt;5ZhLc5swEMc/jY/NgMTzGDtOe2inmfGh6akjgwxqAHmE/Oqn78oIMK/gNLZnMvXF0kosq99/WXaY4Fm6/yzIOv7GQ5pMkBHuJ/hhgpBp2z78KcuhsHiGVxgiwUK9qTYs2B+qjYa2blhI88ZGyXki2bppDHiW0UA2bEQIvmtuW/Gkedc1iWjHsAhI0rX+YKGM9Slso7Z/oSyKyzubhl5ZkuAlEnyT6ftNEF4df8VySkpfen8ek5DvTkx4PsEzwbksRul+RhPFtsRWXPc4sFrFLWgmz7kArZyAWB4iwdKmth98QoWHLUk2tDzCMVB5KOGAB9ABJtNdzCRdrEmgVnaQCmCLZZrAzIRhLgV/qQDC2aYrliQznnBx9ITn9mz2CKFNOfhgUiULxIunOgYqJN0PHsyscEEaUp5SKQ6wpbzAcIpLdAZapYtdrafpaxXiUy1LaYjOoajyXXOEgUZ5JlbT7HAVdJXy8BeH9G0Tfi/XB2tuPtoXAmm1QDpOF6TRAxJfhSMez8/30pv6c+P+UvRwi57r9dDrycKrwLO7z3IIdU9PuZAxj3hGknltnR6LGVUujSZHICAOz9p+nPxUkztF7jeV8qDLOtlIrh7xyvtXzteDWhQRqrCa1Z+IiMqRpDhfFh81VfHwMG7t5Ikz8F15cLzXPeR8IwKqL2ppVsXzjzK6F5Vxz+TzyfiKIhZMhk7lvVVEjNyWBuZbVcSoLWPLRZF315HR+1ilDLVfBG7fi+BGpQw5PfCcBG45XcIgUoPFIZc0nSmi0E2Wy3CrakeHN9CRfYhLpBnPaIuyNpGERRlMA6BJwT5VrBl0lPd6IWVhmAw1TRd5T7eeBtyVx/e78lyl3cH+eG5/iDYSuUaDKnLdbtLfro20jPG0/x5IsoV0h60OSRXLbJmrv//hKcBGs6Ajv6vXzZ4Cq7fpX22y4C69eKm/ZM+PDb9BEffUktv1/JY1XkyCjdgeu5uiMw3v1UcAlYgJyXMWjLGse9k706ya26IV8qDf0oYnKhicR2X2Q11gOn1OB/RI/1pUy64aJ7TtHtilTdCESLZtxnB+D4Sw2XxxlO/WkVa268hrOsJuy9FAMwVakcPJtrXakL8SsNcf8GBcuD+uOh+LCM7s7GBaf58pttcfwfD8Lw==&lt;/diagram&gt;&lt;/mxfile&gt;"
+   id="svg2"
+   inkscape:version="0.91 r13725"
+   sodipodi:docname="call_sc_oct.svg">
+  <metadata
+     id="metadata58">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1366"
+     inkscape:window-height="704"
+     id="namedview56"
+     showgrid="false"
+     inkscape:zoom="0.80397022"
+     inkscape:cx="201.5"
+     inkscape:cy="134"
+     inkscape:window-x="0"
+     inkscape:window-y="27"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g6" />
+  <defs
+     id="defs4" />
+  <g
+     transform="translate(0.5,0.5)"
+     id="g6">
+    <ellipse
+       cx="142"
+       cy="206"
+       rx="95"
+       ry="60"
+       fill-opacity="0.2"
+       fill="#e5ccff"
+       stroke="#000000"
+       stroke-opacity="0.2"
+       stroke-width="2"
+       pointer-events="none"
+       id="ellipse8" />
+    <rect
+       x="87"
+       y="191"
+       width="100"
+       height="30"
+       fill="#d4e1f5"
+       stroke="#000000"
+       stroke-width="2"
+       pointer-events="none"
+       id="rect10" />
+    <g
+       transform="translate(108.5,199.5)"
+       id="g12">
+      <switch
+         id="switch14">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="56"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; width: 57px; white-space: nowrap; word-wrap: normal; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">refmod_oct</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="28"
+           y="12"
+           fill="#000000"
+           text-anchor="middle"
+           font-size="12px"
+           font-family="Helvetica"
+           id="text16">refmod_oct</text>
+      </switch>
+    </g>
+    <rect
+       x="77"
+       y="203"
+       width="10"
+       height="10"
+       fill="#b9e0a5"
+       stroke="#000000"
+       stroke-width="2"
+       pointer-events="none"
+       id="rect18" />
+    <path
+       d="M 9 208 L 68.76 208"
+       fill="none"
+       stroke="#000000"
+       stroke-width="2"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path20" />
+    <path
+       d="M 74.76 208 L 66.76 212 L 68.76 208 L 66.76 204 Z"
+       fill="#000000"
+       stroke="#000000"
+       stroke-width="2"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path22" />
+    <path
+       d="M 197 206 L 260.76 206"
+       fill="none"
+       stroke="#000000"
+       stroke-width="2"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path24" />
+    <path
+       d="M 266.76 206 L 258.76 210 L 260.76 206 L 258.76 202 Z"
+       fill="#000000"
+       stroke="#000000"
+       stroke-width="2"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path26" />
+    <rect
+       x="187"
+       y="201"
+       width="10"
+       height="10"
+       fill="#b9e0a5"
+       stroke="#000000"
+       stroke-width="2"
+       pointer-events="none"
+       id="rect28" />
+    <g
+       transform="translate(99.5,164.5)"
+       id="g30">
+      <switch
+         id="switch32">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="75"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; width: 76px; white-space: nowrap; word-wrap: normal; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:b>SystemC side</xhtml:b>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="38"
+           y="12"
+           font-size="12px"
+           id="text34"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">SystemC side</text>
+      </switch>
+    </g>
+    <ellipse
+       cx="306"
+       cy="62"
+       rx="95"
+       ry="60"
+       fill-opacity="0.2"
+       fill="#e5ccff"
+       stroke="#000000"
+       stroke-opacity="0.2"
+       stroke-width="2"
+       pointer-events="none"
+       id="ellipse36" />
+    <g
+       transform="translate(265.5,25.5)"
+       id="g38">
+      <switch
+         id="switch40">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="66"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; width: 67px; white-space: nowrap; word-wrap: normal; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:b>Octave  side</xhtml:b>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="33"
+           y="12"
+           font-size="12px"
+           id="text42"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">Octave side</text>
+      </switch>
+    </g>
+    <rect
+       x="250"
+       y="61"
+       width="100"
+       height="30"
+       fill="#d4e1f5"
+       stroke="#000000"
+       stroke-width="2"
+       pointer-events="none"
+       id="rect44" />
+    <g
+       transform="translate(276.5,69.5)"
+       id="g46">
+      <switch
+         id="switch48">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="45"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; width: 48px; white-space: nowrap; word-wrap: normal; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">reffunc.m</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="23"
+           y="12"
+           fill="#000000"
+           text-anchor="middle"
+           font-size="12px"
+           font-family="Helvetica"
+           id="text50">reffunc.m</text>
+      </switch>
+    </g>
+    <path
+       d="M 172 151 Q 222 151 197 126 Q 172 101 223.77 100.14"
+       fill="none"
+       stroke="#000000"
+       stroke-width="2"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path52" />
+    <path
+       d="M 229.76 100.04 L 221.83 104.17 L 223.77 100.14 L 221.7 96.17 Z"
+       fill="#000000"
+       stroke="#000000"
+       stroke-width="2"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path54" />
+  </g>
+</svg>
