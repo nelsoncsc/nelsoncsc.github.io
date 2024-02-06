@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - Fixed Point Recursive FFT">
+    <meta name="keywords" content="hardware, design, VLSI, fft, ifft, recursive algorithm, digital signal processing, SystemVerilog, Matlab, Octave, inverse transform">
+    <meta name="author" content="Nelson Campos">
+	
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>Fixed Point Recursive FFT</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <!-- Custom Fonts -->
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <!-- for using MathJax -->
+    <script type="text/javascript" async
+    src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML">
+    </script>
+
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="about.html">About</a>
+                    </li>
+                    <li>
+                        <a href="peasant.html">Peasant</a>
+                    </li>
+                </ul>
+            </div>
+            <!-- /.navbar-collapse -->
+        </div>
+        <!-- /.container -->
+    </nav>
+
+    <!-- Page Header -->
+    <!-- Set your background image for this header on the line below. -->
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>Fixed Point Recursive FFT</h1>
+                        <h2 class="subheading">Implementation of the forward and inverse FFT using hardware recursion</h2>
+                        <span class="meta">Posted by <a href="about.html">Nelson Campos</a> on March 03, 2018</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Post Content -->
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <p>The Fast Fourier Transform is one of the most important operations in Digital Signal Processing 
+                       and has many applications, for example, in the analysis of communication signals or to perform the Discrete Cosine Transform
+                       widely used in audio and image data compression algorithms.</p>
+
+                     <p>Let \(x[n]\) be a series of complex signals, for \(0\leq n\leq N-1\) and \(X[k]\) the Discrete Fourier Transform 
+                        of \(x[n]\), for \(0\leq k\leq N-1\). The frequency domain signals \(X[k]\) can be obtained according to equation
+                        \(\ref{eq:fft1}\) or in its matrix form as can be seen in equation \(\ref{eq:fft2}\), 
+                         where \(W_N^{kn} = e^{\frac{-2i\pi kn}{N}}\).</p>
+
+                     $$\begin{equation}
+                          X[k] = \sum_{n=0}^{N-1}x[n]W_N^{kn}
+                       \end{equation}\tag{1}\label{eq:fft1}$$
+
+                     $$\begin{equation}\begin{bmatrix}
+                                          X[0]\\ \\ \vdots\\ \\ X[N-1]
+                                        \end{bmatrix} = 
+                                        \begin{bmatrix}
+                                          W_N^{0\times0} &\dots &  W_N^{0\times(N-1)}\\ \\ \vdots &\ddots &\vdots\\ 
+                                          \\ W_N^{(N-1)\times0} & \dots & W_N^{(N-1)^2} 
+                                         \end{bmatrix}\times 
+                                         \begin{bmatrix}
+                                           x[0]\\ \\ \vdots\\ \\ x[N-1]
+                                         \end{bmatrix}
+                       \end{equation}\tag{2}\label{eq:fft2}$$
+	           
+                    
+                    <p>The computation of \(X[k]\) has complexity of \(O(n^2)\). However, the expression of the equation \(\ref{eq:fft1}\)
+                       may be split in two terms according to equation \(\ref{eq:fft3}\).</p>
+
+                    $$\begin{equation}X[k] = \sum_{n=0}^{N-1}x[2n]W_N^{2nk}+\sum_{n=0}^{N-1}x[2n+1]W_N^{(2n+1)k}
+                       \end{equation}\tag{3}\label{eq:fft3}$$
+
+                     <p>Note that applying the properties \(W_N^{2kn} = W_{N/2}^{kn}\) and \(W_N^{k+N/2} = -W_N^{kn}\) into equation 
+                        \(\ref{eq:fft3}\), equation \(\ref{eq:fft4}\) is obtained, where \(Xe[k] = \sum\limits_{n=0}^{(N/2)-1}x[2n]W_{N/2}^{nk}\)
+                        and \(Xo[k] = \sum\limits_{n=0}^{(N/2)-1}x[2n+1]W_{N/2}^{nk}\).</p>
+                     
+                      $$\left\{\begin{matrix}
+                               X[k] = Xe[k]+W_N^k Xo[k]\\
+                               \\ 
+                               X[k+N/2] = Xe[k]-W_N^k Xo[k]
+                               \end{matrix}\right.\tag{4}\label{eq:fft4}$$
+
+                     <p>According to equation \(\ref{eq:fft4}\), if N is a power of 2, the computation of \(X[k]\) 
+                        has complexity of \(O(N\times log_2(N))\).</p>
+
+                     <p>To retrieve the signals \(x[n]\) the inverse transform is applied according to the equation \(\ref{eq:fft5}\).</p>
+                     
+                      $$\begin{equation}
+                          x[n] = \frac{1}{N}\sum_{k=0}^{N-1}X[k]W_N^{-kn}
+                       \end{equation}\tag{5}\label{eq:fft5}$$
+
+                    <h class="section-heading">Recursive algorithm</h>
+                    <p>A very simple algorithm to compute the FFT can be defined taking advantage of the recursive nature of the FFT, as can
+                       be seen in Figure 1.
+
+                    <a href="img/fft/rfft.svg">
+                    <img class="img-responsive center-block" src="img/fft/rfft.svg" alt="" width="55%" height="55%"></a>
+	            <span class="caption text-muted">Figure 1: The FFT recursive algorithm</span>
+
+                       <ul>
+                       <li> if the size \(N\) of the FFT is even then call two FFT of order \(N/2\), one to compute the Fourier Transform of the
+                       signals with even index (\(x[2n]\)) and other to compute the signals with odd index (\(x[2n+1]\)). The Fourier Transform
+                       will be scaled with the twiddle factor \(W_N^k\).
+                       
+                    <a href="img/fft/FFT.svg">
+                    <img class="img-responsive center-block" src="img/fft/FFT.svg" alt=""></a>
+	            <span class="caption text-muted">Figure 2: N-point FFT split in two (N/2)-point FFT</span>
+                       <li> if \(N\) is odd then the FFT will be slowly calculated using the Fourier matrix of equation \(\ref{eq:fft2}\).
+                       </ul>
+
+                    <p>If the length N of the FFT is of the form \(N = m\times 2^p\) the the complexity of the algorithm of 
+                       Figure 1 will be \(O(m^2)\times O(p\times log_2(p))\).</p>
+
+                    <p>A geometric interpretation of the complexity of the FFT can be seen as follows:</p>
+                    <ul>
+                       <li> when \(N\) is even the algorithm will perform the butterfly computation wich requires N floating-point operations,
+                            as can be seen in Figure 2, and the butterfly will be called recursively \(log_2(N)\) times.
+
+                       <a href="img/fft/butterfly.svg">
+                       <img class="img-responsive center-block" src="img/fft/butterfly.svg" alt="" width="80%" height="80%"></a>
+	               <span class="caption text-muted">Figure 2: The FFT butterfly</span>
+
+                       <li> when \(N\) is odd then Fourier matrix computation requires \(N^2\) floating-point operations, as can
+                            be seen in Figure 3.</p>
+                       <a href="img/fft/computeMatrix.svg">
+                      <img class="img-responsive center-block" src="img/fft/computeMatrix.svg" alt="" width="80%" height="80%"></a>
+	              <span class="caption text-muted">Figure 3: The Fourier Matrix</span>
+                       </ul>
+
+                    <p>The inverse transform may be obtained using the forward transform according to Figure 4.</p>
+
+                     <a href="img/fft/iFFT.svg">
+                      <img class="img-responsive center-block" src="img/fft/iFFT.svg" alt="" width="50%" height="50%"></a>
+	              <span class="caption text-muted">Figure 4: The inverse FFT</span>
+
+                    <p>The block to divide by \(N\) can be computed in hardware according to the algorithm of Figure 5.</p>
+
+                    <a href="img/fft/divn.svg">
+                      <img class="img-responsive center-block" src="img/fft/divn.svg" alt=""></a>
+	              <span class="caption text-muted">Figure 5: The divbyN block</span>
+
+                    <h class="section-heading">Software implementation</h>
+		    <p>The forward and inverse FFT algorithm was implemented using Octave (compatible with MATLAB) and the codes
+                       can be seen below:</p>
+
+                     <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">function</span><span style="color: #bbbbbb"> </span>[Yr, Yi] =<span style="color: #bbbbbb"> </span><span style="color: #0066BB; font-weight: bold">butterfly</span>(Xer, Xei, Xor, Xoi, N)<span style="color: #bbbbbb"></span>
+
+<span style="color: #bbbbbb">  </span><span style="color: #008800; font-weight: bold">for</span> k=<span style="color: #0000DD; font-weight: bold">0</span>:N<span style="color: #333333">/</span><span style="color: #0000DD; font-weight: bold">2</span><span style="color: #333333">-</span><span style="color: #0000DD; font-weight: bold">1</span>
+    wr(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>) = <span style="color: #007020">cos</span>(<span style="color: #333333">-</span><span style="color: #0000DD; font-weight: bold">2</span><span style="color: #333333">*</span><span style="color: #007020">pi</span><span style="color: #333333">*</span>k<span style="color: #333333">/</span>N);
+    wi(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>) = <span style="color: #007020">sin</span>(<span style="color: #333333">-</span><span style="color: #0000DD; font-weight: bold">2</span><span style="color: #333333">*</span><span style="color: #007020">pi</span><span style="color: #333333">*</span>k<span style="color: #333333">/</span>N);
+  <span style="color: #008800; font-weight: bold">end</span>
+ 
+  <span style="color: #008800; font-weight: bold">for</span> k=<span style="color: #0000DD; font-weight: bold">1</span>:N<span style="color: #333333">/</span><span style="color: #0000DD; font-weight: bold">2</span>
+    G1(k) = wr(k)<span style="color: #333333">*</span>Xor(k)<span style="color: #333333">-</span>wi(k)<span style="color: #333333">*</span>Xoi(k);
+    G2(k) = wr(k)<span style="color: #333333">*</span>Xoi(k)<span style="color: #333333">+</span>wi(k)<span style="color: #333333">*</span>Xor(k);
+  <span style="color: #008800; font-weight: bold">end</span>
+
+   <span style="color: #008800; font-weight: bold">for</span> k=<span style="color: #0000DD; font-weight: bold">1</span>:N<span style="color: #333333">/</span><span style="color: #0000DD; font-weight: bold">2</span>
+     Yr(k) = Xer(k)<span style="color: #333333">+</span>G1(k);
+     Yr(k<span style="color: #333333">+</span>N<span style="color: #333333">/</span><span style="color: #0000DD; font-weight: bold">2</span>) = Xer(k)<span style="color: #333333">-</span>G1(k);
+     Yi(k) = Xei(k)<span style="color: #333333">+</span>G2(k);
+     Yi(k<span style="color: #333333">+</span>N<span style="color: #333333">/</span><span style="color: #0000DD; font-weight: bold">2</span>) = Xei(k)<span style="color: #333333">-</span>G2(k);
+   <span style="color: #008800; font-weight: bold">end</span>
+<span style="color: #008800; font-weight: bold">end</span>
+</pre></div>
+                    <span class="caption text-muted">The butterfly computation (butterfly.m)</span>
+                    
+                    <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">function</span><span style="color: #bbbbbb"> </span>[Yr, Yi] =<span style="color: #bbbbbb"> </span><span style="color: #0066BB; font-weight: bold">computeMatrix</span>(xr, xi)<span style="color: #bbbbbb"></span>
+<span style="color: #bbbbbb">    </span>N = <span style="color: #007020">length</span>(xr);
+
+    <span style="color: #008800; font-weight: bold">for</span> k=<span style="color: #0000DD; font-weight: bold">0</span>:N<span style="color: #333333">-</span><span style="color: #0000DD; font-weight: bold">1</span>
+      <span style="color: #008800; font-weight: bold">for</span> <span style="color: #007020">j</span>=<span style="color: #0000DD; font-weight: bold">0</span>:N<span style="color: #333333">-</span><span style="color: #0000DD; font-weight: bold">1</span>
+        Fr(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>,<span style="color: #007020">j</span><span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>) = <span style="color: #007020">cos</span>(<span style="color: #333333">-</span><span style="color: #0000DD; font-weight: bold">2</span><span style="color: #333333">*</span><span style="color: #007020">pi</span><span style="color: #333333">*</span>k<span style="color: #333333">*</span><span style="color: #007020">j</span><span style="color: #333333">/</span>N);
+        Fi(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>,<span style="color: #007020">j</span><span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>) = <span style="color: #007020">sin</span>(<span style="color: #333333">-</span><span style="color: #0000DD; font-weight: bold">2</span><span style="color: #333333">*</span><span style="color: #007020">pi</span><span style="color: #333333">*</span>k<span style="color: #333333">*</span><span style="color: #007020">j</span><span style="color: #333333">/</span>N);
+      <span style="color: #008800; font-weight: bold">end</span>
+    <span style="color: #008800; font-weight: bold">end</span>
+    Yr = <span style="color: #007020">zeros</span>(N,<span style="color: #0000DD; font-weight: bold">1</span>); 
+    Yi = <span style="color: #007020">zeros</span>(N,<span style="color: #0000DD; font-weight: bold">1</span>);
+    <span style="color: #008800; font-weight: bold">for</span> k=<span style="color: #0000DD; font-weight: bold">0</span>:N<span style="color: #333333">-</span><span style="color: #0000DD; font-weight: bold">1</span>
+      <span style="color: #008800; font-weight: bold">for</span> <span style="color: #007020">j</span>=<span style="color: #0000DD; font-weight: bold">0</span>:N<span style="color: #333333">-</span><span style="color: #0000DD; font-weight: bold">1</span>
+        Yr(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>) = Yr(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>)<span style="color: #333333">+</span>Fr(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>,<span style="color: #007020">j</span><span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>)<span style="color: #333333">*</span>xr(<span style="color: #007020">j</span><span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>)<span style="color: #333333">-</span>Fi(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>,<span style="color: #007020">j</span><span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>)<span style="color: #333333">*</span>xi(<span style="color: #007020">j</span><span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>);
+        Yi(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>) = Yi(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>)<span style="color: #333333">+</span>Fr(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>,<span style="color: #007020">j</span><span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>)<span style="color: #333333">*</span>xi(<span style="color: #007020">j</span><span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>)<span style="color: #333333">+</span>Fi(k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>,<span style="color: #007020">j</span><span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>)<span style="color: #333333">*</span>xr(<span style="color: #007020">j</span><span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span>);
+      <span style="color: #008800; font-weight: bold">end</span>
+    <span style="color: #008800; font-weight: bold">end</span>
+<span style="color: #008800; font-weight: bold">end</span>
+</pre></div>
+
+                    <span class="caption text-muted">The Fourier matrix computation (computeMatrix.m)</span>
+                     
+                    <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">function</span><span style="color: #bbbbbb"> </span>[Yr, Yi] =<span style="color: #bbbbbb"> </span><span style="color: #0066BB; font-weight: bold">FFT</span>(xr, xi)<span style="color: #bbbbbb"></span>
+<span style="color: #bbbbbb">  </span>N = <span style="color: #007020">length</span>(xr);
+  <span style="color: #008800; font-weight: bold">if</span> <span style="color: #007020">rem</span>(N,<span style="color: #0000DD; font-weight: bold">2</span>) <span style="color: #333333">==</span> <span style="color: #0000DD; font-weight: bold">0</span> 
+    <span style="color: #008800; font-weight: bold">for</span> k=<span style="color: #0000DD; font-weight: bold">0</span>:N<span style="color: #333333">/</span><span style="color: #0000DD; font-weight: bold">2</span><span style="color: #333333">-</span><span style="color: #0000DD; font-weight: bold">1</span>
+      xe_r(k<span style="color: #333333">+</span>(<span style="color: #0000DD; font-weight: bold">1</span>))=xr(<span style="color: #0000DD; font-weight: bold">2</span><span style="color: #333333">*</span>k<span style="color: #333333">+</span>(<span style="color: #0000DD; font-weight: bold">1</span>)); 
+      xo_r(k<span style="color: #333333">+</span>(<span style="color: #0000DD; font-weight: bold">1</span>))=xr(<span style="color: #0000DD; font-weight: bold">2</span><span style="color: #333333">*</span>k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span><span style="color: #333333">+</span>(<span style="color: #0000DD; font-weight: bold">1</span>));
+
+      xe_i(k<span style="color: #333333">+</span>(<span style="color: #0000DD; font-weight: bold">1</span>))=xi(<span style="color: #0000DD; font-weight: bold">2</span><span style="color: #333333">*</span>k<span style="color: #333333">+</span>(<span style="color: #0000DD; font-weight: bold">1</span>)); 
+      xo_i(k<span style="color: #333333">+</span>(<span style="color: #0000DD; font-weight: bold">1</span>))=xi(<span style="color: #0000DD; font-weight: bold">2</span><span style="color: #333333">*</span>k<span style="color: #333333">+</span><span style="color: #0000DD; font-weight: bold">1</span><span style="color: #333333">+</span>(<span style="color: #0000DD; font-weight: bold">1</span>));
+    <span style="color: #008800; font-weight: bold">end</span>
+
+    [Xer, Xei] = FFT(xe_r, xe_i);
+    [Xor, Xoi] = FFT(xo_r, xo_i);
+    [Yr, Yi] = butterfly(Xer, Xei, Xor, Xoi, N);
+    
+  <span style="color: #008800; font-weight: bold">else</span>
+    [Yr, Yi] = computeMatrix(xr, xi);
+  <span style="color: #008800; font-weight: bold">end</span>
+<span style="color: #008800; font-weight: bold">end</span>
+</pre></div>
+
+                    <span class="caption text-muted">The forward FFT (FFT.m)</span>
+    
+                    <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">function</span><span style="color: #bbbbbb"> </span>[Yr, Yi] =<span style="color: #bbbbbb"> </span><span style="color: #0066BB; font-weight: bold">iFFT</span>(xr, xi)<span style="color: #bbbbbb"></span>
+<span style="color: #bbbbbb">  </span>N = <span style="color: #007020">length</span>(xr);
+  [Xi, Xr] = FFT(xi, xr);
+  Yr = Xr<span style="color: #333333">/</span>N;
+  Yi = Xi<span style="color: #333333">/</span>N;
+<span style="color: #008800; font-weight: bold">end</span>
+</pre></div>
+
+                    <span class="caption text-muted">The inverse FFT (iFFT.m)</span>
+
+                    <h class="section-heading">Hardware implementation</h>
+	            <p>As many programming languages, SystemVerilog (which is a Hardware Description Language) supports recursion 
+                      (since Verilog-2001). The forward and inverse FFT parameterized by the length \(N\) of the signals (in fixed-point format) 
+                       were implemented using SystemVerilog and the codes can be seen below. Note that the system functions 
+                       <i><strong>$cos()</strong></i> and <i><strong>$sin()</strong></i> in the butterly and computeMatrix modules are computing 
+                       known values during elaboration time and therefore the codes are describing synthesizable hardware.</p>
+                    
+                    <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">module</span> butterfly #(<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>, 
+                   <span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>)
+                  (<span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] Xe[<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>], 
+                   <span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] Xo[<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>],
+                   <span style="color: #008800; font-weight: bold">output</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #003366; font-weight: bold">X</span>[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>]);
+                     
+  <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #003366; font-weight: bold">G</span>[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>];
+  
+  <span style="color: #008800; font-weight: bold">localparam</span> theta <span style="color: #333333">=</span> <span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">2</span><span style="color: #333333">*</span><span style="color: #FF0000; background-color: #FFAAAA">$</span>acos(<span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span>)<span style="color: #333333">/</span><span style="color: #003366; font-weight: bold">N</span>;
+  
+  <span style="color: #008800; font-weight: bold">always_comb</span>  
+    <span style="color: #008800; font-weight: bold">for</span>(<span style="color: #008800; font-weight: bold">int</span> k<span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">0</span>; k<span style="color: #333333">&lt;</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>; k<span style="color: #333333">++</span>)<span style="color: #008800; font-weight: bold">begin</span>
+      <span style="color: #888888">// Nodes on the butterfly</span>
+      <span style="color: #003366; font-weight: bold">G</span>[k][<span style="color: #005588; font-weight: bold">0</span>] <span style="color: #333333">=</span> (<span style="color: #FF0000; background-color: #FFAAAA">$</span>cos(theta<span style="color: #333333">*</span>k)<span style="color: #333333">*</span>Xo[k][<span style="color: #005588; font-weight: bold">0</span>])<span style="color: #333333">-</span>(<span style="color: #FF0000; background-color: #FFAAAA">$</span>sin(theta<span style="color: #333333">*</span>k)<span style="color: #333333">*</span>Xo[k][<span style="color: #005588; font-weight: bold">1</span>]);
+      <span style="color: #003366; font-weight: bold">G</span>[k][<span style="color: #005588; font-weight: bold">1</span>] <span style="color: #333333">=</span> (<span style="color: #FF0000; background-color: #FFAAAA">$</span>cos(theta<span style="color: #333333">*</span>k)<span style="color: #333333">*</span>Xo[k][<span style="color: #005588; font-weight: bold">1</span>])<span style="color: #333333">+</span>(<span style="color: #FF0000; background-color: #FFAAAA">$</span>sin(theta<span style="color: #333333">*</span>k)<span style="color: #333333">*</span>Xo[k][<span style="color: #005588; font-weight: bold">0</span>]);
+
+      <span style="color: #888888">// Butterfly computation</span>
+      <span style="color: #003366; font-weight: bold">X</span>[k][<span style="color: #005588; font-weight: bold">0</span>] <span style="color: #333333">=</span> Xe[k][<span style="color: #005588; font-weight: bold">0</span>]<span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">G</span>[k][<span style="color: #005588; font-weight: bold">0</span>];
+      <span style="color: #003366; font-weight: bold">X</span>[k][<span style="color: #005588; font-weight: bold">1</span>] <span style="color: #333333">=</span> Xe[k][<span style="color: #005588; font-weight: bold">1</span>]<span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">G</span>[k][<span style="color: #005588; font-weight: bold">1</span>];
+      
+      <span style="color: #003366; font-weight: bold">X</span>[k<span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>][<span style="color: #005588; font-weight: bold">0</span>] <span style="color: #333333">=</span> Xe[k][<span style="color: #005588; font-weight: bold">0</span>]<span style="color: #333333">-</span><span style="color: #003366; font-weight: bold">G</span>[k][<span style="color: #005588; font-weight: bold">0</span>];
+      <span style="color: #003366; font-weight: bold">X</span>[k<span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>][<span style="color: #005588; font-weight: bold">1</span>] <span style="color: #333333">=</span> Xe[k][<span style="color: #005588; font-weight: bold">1</span>]<span style="color: #333333">-</span><span style="color: #003366; font-weight: bold">G</span>[k][<span style="color: #005588; font-weight: bold">1</span>];
+     <span style="color: #008800; font-weight: bold">end</span>
+  
+<span style="color: #008800; font-weight: bold">endmodule</span><span style="color: #333333">:</span> butterfly
+</pre></div>
+
+		    <span class="caption text-muted">The butterfly module (butterfly.sv)</span>
+                    
+                    <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">module</span> computeMatrix #(<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>, 
+                       <span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>)
+                      (<span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] x[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>],
+                       <span style="color: #008800; font-weight: bold">output</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #003366; font-weight: bold">X</span>[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>]);
+  
+  <span style="color: #008800; font-weight: bold">localparam</span> theta <span style="color: #333333">=</span> <span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">2</span><span style="color: #333333">*</span><span style="color: #FF0000; background-color: #FFAAAA">$</span>acos(<span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span>)<span style="color: #333333">/</span><span style="color: #003366; font-weight: bold">N</span>;
+  <span style="color: #888888">// Computation of the Fourier matrix</span>
+  <span style="color: #008800; font-weight: bold">always_comb</span>  
+    <span style="color: #008800; font-weight: bold">for</span>(<span style="color: #008800; font-weight: bold">int</span> k<span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">0</span>; k<span style="color: #333333">&lt;</span><span style="color: #003366; font-weight: bold">N</span>; k<span style="color: #333333">++</span>)<span style="color: #008800; font-weight: bold">begin</span>
+      <span style="color: #003366; font-weight: bold">X</span>[k][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #333333">=</span> {<span style="color: #005588; font-weight: bold">0</span>,<span style="color: #005588; font-weight: bold">0</span>};
+      <span style="color: #008800; font-weight: bold">for</span>(<span style="color: #008800; font-weight: bold">int</span> j<span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">0</span>; j<span style="color: #333333">&lt;</span><span style="color: #003366; font-weight: bold">N</span>; j<span style="color: #333333">++</span>)<span style="color: #008800; font-weight: bold">begin</span>
+        <span style="color: #003366; font-weight: bold">X</span>[k][<span style="color: #005588; font-weight: bold">0</span>] <span style="color: #333333">=</span> <span style="color: #003366; font-weight: bold">X</span>[k][<span style="color: #005588; font-weight: bold">0</span>]<span style="color: #333333">+</span>(<span style="color: #FF0000; background-color: #FFAAAA">$</span>cos(theta<span style="color: #333333">*</span>k<span style="color: #333333">*</span>j)<span style="color: #333333">*</span>x[j][<span style="color: #005588; font-weight: bold">0</span>])<span style="color: #333333">-</span>(<span style="color: #FF0000; background-color: #FFAAAA">$</span>sin(theta<span style="color: #333333">*</span>k<span style="color: #333333">*</span>j)<span style="color: #333333">*</span>x[j][<span style="color: #005588; font-weight: bold">1</span>]);
+        <span style="color: #003366; font-weight: bold">X</span>[k][<span style="color: #005588; font-weight: bold">1</span>] <span style="color: #333333">=</span> <span style="color: #003366; font-weight: bold">X</span>[k][<span style="color: #005588; font-weight: bold">1</span>]<span style="color: #333333">+</span>(<span style="color: #FF0000; background-color: #FFAAAA">$</span>cos(theta<span style="color: #333333">*</span>k<span style="color: #333333">*</span>j)<span style="color: #333333">*</span>x[j][<span style="color: #005588; font-weight: bold">1</span>])<span style="color: #333333">+</span>(<span style="color: #FF0000; background-color: #FFAAAA">$</span>sin(theta<span style="color: #333333">*</span>k<span style="color: #333333">*</span>j)<span style="color: #333333">*</span>x[j][<span style="color: #005588; font-weight: bold">0</span>]);
+      <span style="color: #008800; font-weight: bold">end</span>
+    <span style="color: #008800; font-weight: bold">end</span>
+  
+<span style="color: #008800; font-weight: bold">endmodule</span><span style="color: #333333">:</span> computeMatrix
+</pre></div>
+
+                    <span class="caption text-muted">The computeMatrix module (computeMatrix.sv)</span>
+
+                    <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">module</span> invN #(<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>, <span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>, <span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">BIT_FRAC</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>)           
+             (<span style="color: #008800; font-weight: bold">output</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] y);
+  
+  <span style="color: #008800; font-weight: bold">logic</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #003366; font-weight: bold">A</span>, <span style="color: #003366; font-weight: bold">T</span>;
+  <span style="color: #008800; font-weight: bold">always_comb</span> <span style="color: #008800; font-weight: bold">begin</span>
+    <span style="color: #003366; font-weight: bold">A</span> <span style="color: #333333">=</span> <span style="color: #005588; font-weight: bold">0</span>;
+    <span style="color: #003366; font-weight: bold">T</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">&lt;&lt;</span><span style="color: #003366; font-weight: bold">BIT_FRAC</span>;
+    <span style="color: #008800; font-weight: bold">for</span>(<span style="color: #008800; font-weight: bold">int</span> k<span style="color: #333333">=</span><span style="color: #003366; font-weight: bold">BIT_FRAC</span>; k<span style="color: #333333">&gt;=</span><span style="color: #005588; font-weight: bold">0</span>; k<span style="color: #333333">--</span>)
+      <span style="color: #008800; font-weight: bold">if</span>(<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">&lt;&lt;</span>k <span style="color: #333333">&lt;=</span> <span style="color: #003366; font-weight: bold">T</span>)<span style="color: #008800; font-weight: bold">begin</span>
+        <span style="color: #003366; font-weight: bold">A</span> <span style="color: #333333">=</span> <span style="color: #003366; font-weight: bold">A</span><span style="color: #333333">+</span>(<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">&lt;&lt;</span>k);
+        <span style="color: #003366; font-weight: bold">T</span> <span style="color: #333333">=</span> <span style="color: #003366; font-weight: bold">T</span><span style="color: #333333">-</span>(<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">&lt;&lt;</span>k);
+      <span style="color: #008800; font-weight: bold">end</span>
+    y <span style="color: #333333">=</span> <span style="color: #003366; font-weight: bold">A</span>;    
+  <span style="color: #008800; font-weight: bold">end</span>
+  
+<span style="color: #008800; font-weight: bold">endmodule</span><span style="color: #333333">:</span> invN
+</pre></div>
+
+                    <span class="caption text-muted">The invN module (invN.sv)</span>
+
+                    <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #003366; font-weight: bold">`include</span> <span style="background-color: #fff0f0">&quot;invN.sv&quot;</span>
+
+<span style="color: #008800; font-weight: bold">module</span> divbyN  #(<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>, <span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>)
+                (<span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] x[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>],
+                 <span style="color: #008800; font-weight: bold">output</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] y[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>]);
+  
+  <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] inv_N;
+  invN #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span>), .<span style="color: #003366; font-weight: bold">BIT_FRAC</span>(<span style="color: #003366; font-weight: bold">BIT_FRAC</span>)) m_invN(.y(inv_N));
+  
+  <span style="color: #008800; font-weight: bold">int</span> p <span style="color: #333333">=</span> <span style="color: #FF0000; background-color: #FFAAAA">$</span>clog2(<span style="color: #003366; font-weight: bold">N</span>);
+  
+  <span style="color: #008800; font-weight: bold">localparam</span> c <span style="color: #333333">=</span> isPowerOfTwo(<span style="color: #003366; font-weight: bold">N</span>);
+  
+  <span style="color: #008800; font-weight: bold">if</span>(c) <span style="color: #008800; font-weight: bold">begin</span>
+    <span style="color: #008800; font-weight: bold">always_comb</span> 
+      <span style="color: #008800; font-weight: bold">for</span>(<span style="color: #008800; font-weight: bold">int</span> k<span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">0</span>; k<span style="color: #333333">&lt;</span><span style="color: #003366; font-weight: bold">N</span>; k<span style="color: #333333">++</span>)<span style="color: #008800; font-weight: bold">begin</span>
+        y[k][<span style="color: #005588; font-weight: bold">0</span>] <span style="color: #333333">=</span> x[k][<span style="color: #005588; font-weight: bold">0</span>]<span style="color: #333333">&gt;&gt;&gt;</span>p;
+        y[k][<span style="color: #005588; font-weight: bold">1</span>] <span style="color: #333333">=</span> x[k][<span style="color: #005588; font-weight: bold">1</span>]<span style="color: #333333">&gt;&gt;&gt;</span>p;;
+      <span style="color: #008800; font-weight: bold">end</span>
+  <span style="color: #008800; font-weight: bold">end</span>  
+  <span style="color: #008800; font-weight: bold">else</span> <span style="color: #008800; font-weight: bold">begin</span>  
+    <span style="color: #008800; font-weight: bold">always_comb</span> 
+      <span style="color: #008800; font-weight: bold">for</span>(<span style="color: #008800; font-weight: bold">int</span> k<span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">0</span>; k<span style="color: #333333">&lt;</span><span style="color: #003366; font-weight: bold">N</span>; k<span style="color: #333333">++</span>)<span style="color: #008800; font-weight: bold">begin</span>
+        y[k][<span style="color: #005588; font-weight: bold">0</span>] <span style="color: #333333">=</span> round(x[k][<span style="color: #005588; font-weight: bold">0</span>]<span style="color: #333333">*</span>inv_N);
+        y[k][<span style="color: #005588; font-weight: bold">1</span>] <span style="color: #333333">=</span> round(x[k][<span style="color: #005588; font-weight: bold">1</span>]<span style="color: #333333">*</span>inv_N);
+      <span style="color: #008800; font-weight: bold">end</span>
+  <span style="color: #008800; font-weight: bold">end</span>
+  
+  <span style="color: #008800; font-weight: bold">function</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] round(<span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] x);
+    <span style="color: #008800; font-weight: bold">return</span> (x<span style="color: #333333">+</span>(<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">&lt;&lt;&lt;</span>(<span style="color: #003366; font-weight: bold">BIT_FRAC</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span>)))<span style="color: #333333">&gt;&gt;&gt;</span><span style="color: #003366; font-weight: bold">BIT_FRAC</span>;
+  <span style="color: #008800; font-weight: bold">endfunction</span><span style="color: #333333">:</span> round
+  
+  <span style="color: #008800; font-weight: bold">function</span> <span style="color: #008800; font-weight: bold">logic</span> isPowerOfTwo (<span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">integer</span> <span style="color: #003366; font-weight: bold">N</span>);
+    <span style="color: #008800; font-weight: bold">return</span> (<span style="color: #003366; font-weight: bold">N</span> <span style="color: #333333">!=</span> <span style="color: #005588; font-weight: bold">0</span>) <span style="color: #333333">&amp;&amp;</span> ((<span style="color: #003366; font-weight: bold">N</span> <span style="color: #333333">&amp;</span> (<span style="color: #003366; font-weight: bold">N</span> <span style="color: #333333">-</span> <span style="color: #005588; font-weight: bold">1</span>)) <span style="color: #333333">==</span> <span style="color: #005588; font-weight: bold">0</span>);
+  <span style="color: #008800; font-weight: bold">endfunction</span><span style="color: #333333">:</span> isPowerOfTwo
+  
+<span style="color: #008800; font-weight: bold">endmodule</span><span style="color: #333333">:</span> divbyN
+
+  
+</pre></div>
+
+                    <span class="caption text-muted">The divbyN module (divbyN.sv)</span>
+
+                    <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">module</span> swap #(<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>, <span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>)
+             (<span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] x[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>],
+              <span style="color: #008800; font-weight: bold">output</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] y[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>]);
+  
+  <span style="color: #008800; font-weight: bold">always_comb</span> 
+    <span style="color: #008800; font-weight: bold">for</span>(<span style="color: #008800; font-weight: bold">int</span> k<span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">0</span>; k<span style="color: #333333">&lt;</span><span style="color: #003366; font-weight: bold">N</span>; k<span style="color: #333333">++</span>)<span style="color: #008800; font-weight: bold">begin</span>
+      y[k][<span style="color: #005588; font-weight: bold">0</span>] <span style="color: #333333">=</span> x[k][<span style="color: #005588; font-weight: bold">1</span>];
+      y[k][<span style="color: #005588; font-weight: bold">1</span>] <span style="color: #333333">=</span> x[k][<span style="color: #005588; font-weight: bold">0</span>];
+    <span style="color: #008800; font-weight: bold">end</span>
+<span style="color: #008800; font-weight: bold">endmodule</span><span style="color: #333333">:</span> swap
+</pre></div>
+
+                    <span class="caption text-muted">The swap module (swap.sv)</span>
+
+                    <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">BIT_INT</span> <span style="color: #333333">=</span> <span style="color: #005588; font-weight: bold">16</span>;
+<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">BIT_FRAC</span> <span style="color: #333333">=</span> <span style="color: #005588; font-weight: bold">16</span>;
+<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">W</span> <span style="color: #333333">=</span> <span style="color: #003366; font-weight: bold">BIT_INT</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">BIT_FRAC</span>;
+
+<span style="color: #003366; font-weight: bold">`include</span> <span style="background-color: #fff0f0">&quot;butterfly.sv&quot;</span>
+<span style="color: #003366; font-weight: bold">`include</span> <span style="background-color: #fff0f0">&quot;computeMatrix.sv&quot;</span>
+<span style="color: #003366; font-weight: bold">`include</span> <span style="background-color: #fff0f0">&quot;swap.sv&quot;</span>
+<span style="color: #003366; font-weight: bold">`include</span> <span style="background-color: #fff0f0">&quot;divbyN.sv&quot;</span>
+
+<span style="color: #008800; font-weight: bold">module</span> <span style="color: #003366; font-weight: bold">FFT</span> #(<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">N</span> <span style="color: #333333">=</span> <span style="color: #005588; font-weight: bold">1</span>, <span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span>)
+            (<span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] x[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>],
+             <span style="color: #008800; font-weight: bold">output</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #003366; font-weight: bold">X</span>[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>]);
+            
+  <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] xe[<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>], xo[<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>];
+  <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] Xe[<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>], Xo[<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>];
+  
+  <span style="color: #008800; font-weight: bold">always_comb</span> 
+    <span style="color: #008800; font-weight: bold">for</span>(<span style="color: #008800; font-weight: bold">int</span> k<span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">0</span>; k<span style="color: #333333">&lt;</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>; k<span style="color: #333333">++</span>)<span style="color: #008800; font-weight: bold">begin</span>
+      xe[k][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #333333">=</span> x[<span style="color: #005588; font-weight: bold">2</span><span style="color: #333333">*</span>k][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>];
+      xo[k][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #333333">=</span> x[<span style="color: #005588; font-weight: bold">2</span><span style="color: #333333">*</span>k<span style="color: #333333">+</span><span style="color: #005588; font-weight: bold">1</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>];
+    <span style="color: #008800; font-weight: bold">end</span>
+           
+  <span style="color: #008800; font-weight: bold">if</span>(<span style="color: #333333">!</span><span style="color: #003366; font-weight: bold">N</span>[<span style="color: #005588; font-weight: bold">0</span>]) <span style="color: #008800; font-weight: bold">begin</span>  
+    butterfly #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span>)) m_butterfly(.Xe(Xe), .Xo(Xo), .<span style="color: #003366; font-weight: bold">X</span>(<span style="color: #003366; font-weight: bold">X</span>));
+    
+    <span style="color: #003366; font-weight: bold">FFT</span> #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span>)) FFT_e(.x(xe), .<span style="color: #003366; font-weight: bold">X</span>(Xe));
+    <span style="color: #003366; font-weight: bold">FFT</span> #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">2</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span>)) FFT_o(.x(xo), .<span style="color: #003366; font-weight: bold">X</span>(Xo));   
+  <span style="color: #008800; font-weight: bold">end</span>
+  
+  <span style="color: #008800; font-weight: bold">else</span> computeMatrix #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span>)) Matrix(.x(x), .<span style="color: #003366; font-weight: bold">X</span>(<span style="color: #003366; font-weight: bold">X</span>));
+  
+<span style="color: #008800; font-weight: bold">endmodule</span><span style="color: #333333">:</span> <span style="color: #003366; font-weight: bold">FFT</span>
+
+<span style="color: #008800; font-weight: bold">module</span> iFFT #(<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">N</span> <span style="color: #333333">=</span> <span style="color: #005588; font-weight: bold">1</span>)
+            (<span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] x[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>],
+             <span style="color: #008800; font-weight: bold">output</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #003366; font-weight: bold">X</span>[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>]);
+  
+  <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] x_in[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>];
+  <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] Xa[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>];
+  <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] Xb[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>];
+  
+  swap #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span>)) swap_in(.x(x), .y(x_in));
+  <span style="color: #003366; font-weight: bold">FFT</span> #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span>)) mFFT(.x(x_in), .<span style="color: #003366; font-weight: bold">X</span>(Xa));
+  swap #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span>)) swap_out(.x(Xa), .y(Xb));
+  divbyN #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span>)) divN(.x(Xb), .y(<span style="color: #003366; font-weight: bold">X</span>));
+  
+<span style="color: #008800; font-weight: bold">endmodule</span><span style="color: #333333">:</span> iFFT
+
+<span style="color: #008800; font-weight: bold">module</span> RecursiveFFT #(<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">N</span> <span style="color: #333333">=</span> <span style="color: #005588; font-weight: bold">1</span>, 
+                      <span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">W</span> <span style="color: #333333">=</span> <span style="color: #005588; font-weight: bold">1</span>,
+                      <span style="color: #008800; font-weight: bold">parameter</span> sel <span style="color: #333333">=</span> <span style="color: #005588; font-weight: bold">1</span>)
+                     (<span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] x[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>],
+                      <span style="color: #008800; font-weight: bold">output</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #003366; font-weight: bold">X</span>[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>]);
+
+  <span style="color: #008800; font-weight: bold">if</span>(<span style="color: #333333">!</span>sel)
+    <span style="color: #003366; font-weight: bold">FFT</span> #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span>)) mFFT(.x(x), .<span style="color: #003366; font-weight: bold">X</span>(<span style="color: #003366; font-weight: bold">X</span>));
+  <span style="color: #008800; font-weight: bold">else</span>
+    iFFT #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span>)) miFFT(.x(x), .<span style="color: #003366; font-weight: bold">X</span>(<span style="color: #003366; font-weight: bold">X</span>));
+ 
+<span style="color: #008800; font-weight: bold">endmodule</span><span style="color: #333333">:</span> RecursiveFFT
+</pre></div>
+
+                    <span class="caption text-muted">The FFT and iFFT modules (FFT.sv)</span>
+
+                    <!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #003366; font-weight: bold">`timescale</span> <span style="color: #005588; font-weight: bold">1</span>ns<span style="color: #333333">/</span><span style="color: #005588; font-weight: bold">1</span>ps
+
+<span style="color: #003366; font-weight: bold">`include</span> <span style="background-color: #fff0f0">&quot;FFT.sv&quot;</span>
+
+<span style="color: #557799">`define SAMPLES 4</span>
+<span style="color: #008800; font-weight: bold">parameter</span> <span style="color: #003366; font-weight: bold">N</span> <span style="color: #333333">=</span> <span style="color: #003366; font-weight: bold">`SAMPLES</span>;
+
+<span style="color: #008800; font-weight: bold">module</span> top();
+  
+  <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] x[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>];
+  <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #003366; font-weight: bold">X</span>[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>];
+  
+  <span style="color: #888888">// Set sel=0 to compute the forward FFT</span>
+  <span style="color: #888888">// Set sel=1 to compute the inverse FFT</span>
+  RecursiveFFT #(.<span style="color: #003366; font-weight: bold">N</span>(<span style="color: #003366; font-weight: bold">N</span>), .<span style="color: #003366; font-weight: bold">W</span>(<span style="color: #003366; font-weight: bold">W</span>), .sel(<span style="color: #005588; font-weight: bold">0</span>)) <span style="color: #003366; font-weight: bold">RFFT</span>(.x(x), .<span style="color: #003366; font-weight: bold">X</span>(<span style="color: #003366; font-weight: bold">X</span>));
+  
+  <span style="color: #008800; font-weight: bold">initial</span> <span style="color: #008800; font-weight: bold">begin</span>
+    <span style="color: #008800; font-weight: bold">for</span>(<span style="color: #008800; font-weight: bold">int</span> k<span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">0</span>; k<span style="color: #333333">&lt;</span><span style="color: #003366; font-weight: bold">N</span>; k<span style="color: #333333">++</span>)<span style="color: #008800; font-weight: bold">begin</span>
+      x[k][<span style="color: #005588; font-weight: bold">0</span>]<span style="color: #333333">=</span>k<span style="color: #333333">&lt;&lt;&lt;</span><span style="color: #003366; font-weight: bold">BIT_FRAC</span>;
+      x[k][<span style="color: #005588; font-weight: bold">1</span>]<span style="color: #333333">=</span>(<span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">-</span>k)<span style="color: #333333">&lt;&lt;&lt;</span><span style="color: #003366; font-weight: bold">BIT_FRAC</span>;
+    <span style="color: #008800; font-weight: bold">end</span>
+    
+    #<span style="color: #005588; font-weight: bold">1</span>
+    testFFTinput(.x(x), .<span style="color: #003366; font-weight: bold">X</span>(<span style="color: #003366; font-weight: bold">X</span>));
+    <span style="color: #FF0000; background-color: #FFAAAA">$</span>finish;
+  <span style="color: #008800; font-weight: bold">end</span>
+  
+  <span style="color: #008800; font-weight: bold">localparam</span> <span style="color: #003366; font-weight: bold">K</span><span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">&lt;&lt;</span><span style="color: #003366; font-weight: bold">BIT_FRAC</span>;
+  
+  <span style="color: #008800; font-weight: bold">task</span> testFFTinput(<span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #997700; font-weight: bold">W:</span><span style="color: #005588; font-weight: bold">0</span>] x[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>], 
+                    <span style="color: #008800; font-weight: bold">input</span> <span style="color: #008800; font-weight: bold">logic</span> <span style="color: #008800; font-weight: bold">signed</span> [<span style="color: #003366; font-weight: bold">W</span><span style="color: #333333">+</span><span style="color: #003366; font-weight: bold">N</span><span style="color: #333333">-</span><span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>] <span style="color: #003366; font-weight: bold">X</span>[<span style="color: #003366; font-weight: bold">N</span>][<span style="color: #005588; font-weight: bold">1</span><span style="color: #333333">:</span><span style="color: #005588; font-weight: bold">0</span>]);
+    
+    <span style="color: #008800; font-weight: bold">for</span>(<span style="color: #008800; font-weight: bold">int</span> k<span style="color: #333333">=</span><span style="color: #005588; font-weight: bold">0</span>; k<span style="color: #333333">&lt;</span><span style="color: #003366; font-weight: bold">N</span>; k<span style="color: #333333">++</span>)
+      <span style="color: #007020">$display</span>(<span style="background-color: #fff0f0">&quot;x[%0d]=%0f+i*(%0f), X[%0d]=%f+i*(%f)&quot;</span>, 
+                k, <span style="color: #008800; font-weight: bold">real</span>&#39;(x[k][<span style="color: #005588; font-weight: bold">0</span>])<span style="color: #333333">/</span><span style="color: #003366; font-weight: bold">K</span>, <span style="color: #008800; font-weight: bold">real</span>&#39;(x[k][<span style="color: #005588; font-weight: bold">1</span>])<span style="color: #333333">/</span><span style="color: #003366; font-weight: bold">K</span>, 
+                k, <span style="color: #008800; font-weight: bold">real</span>&#39;(<span style="color: #003366; font-weight: bold">X</span>[k][<span style="color: #005588; font-weight: bold">0</span>])<span style="color: #333333">/</span><span style="color: #003366; font-weight: bold">K</span>, <span style="color: #008800; font-weight: bold">real</span>&#39;(<span style="color: #003366; font-weight: bold">X</span>[k][<span style="color: #005588; font-weight: bold">1</span>])<span style="color: #333333">/</span><span style="color: #003366; font-weight: bold">K</span>);
+  <span style="color: #008800; font-weight: bold">endtask</span><span style="color: #333333">:</span> testFFTinput
+
+<span style="color: #008800; font-weight: bold">endmodule</span><span style="color: #333333">:</span> top
+</pre></div>
+
+                    <span class="caption text-muted">The testbench (top.sv)</span>
+                    
+                    <p>Play it on <a href="https://www.edaplayground.com/x/3mKR">Eda Playground</a>.</p>
+                    <p>Also available in <a href="https://github.com/nelsoncsc/FFT">GitHub</a>. </p>
+
+                    <h class="section-heading">References</h>
+	            <p>[1] <a href="https://blogs.mathworks.com/cleve/2014/09/15/fft-fast-finite-fourier-transform/">
+                               FFT, Fast Finite Fourier Transform</a>.</p>									
+					
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelsoncscampos@gmail.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://br.linkedin.com/in/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-circle fa-linkedin-color fa-stack-2x stacked-line-height"></i>
+                                    <i class="fa fa-linkedin fa-stack-1x fa-inverse stacked-line-height-2"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2018</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- jQuery -->
+    <script src="js/jquery.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+
+    <!-- Custom Theme JavaScript -->
+    <script src="js/clean-blog.min.js"></script>
+
+</body>
+
+</html>

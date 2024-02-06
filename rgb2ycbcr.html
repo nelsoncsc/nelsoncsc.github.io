@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+ 
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+ 
+</script>
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - Hardware Division">
+    <meta name="keywords" content="hardware, color space, algorithm, image processing, digital signal processing, SysmteVerilog, RGB, YCbCr, interface">
+    <meta name="author" content="Nelson Campos">
+	
+	
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>RGB to YCbCr conversion</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <!-- Custom Fonts -->
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="about.html">About</a>
+                    </li>
+                    <li>
+                        <a href="peasant.html">Peasant</a>
+                    </li>
+                </ul>
+            </div>
+            <!-- /.navbar-collapse -->
+        </div>
+        <!-- /.container -->
+    </nav>
+
+    <!-- Page Header -->
+    <!-- Set your background image for this header on the line below. -->
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>RGB to YCbCr conversion</h1>
+                        <h2 class="subheading">Playing with bits and pixels</h2>
+                        <span class="meta">Posted by <a href="about.html">Nelson Campos</a> on August 21, 2016</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Post Content -->
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <p>One important task in image processing applications is the color space conversion. Real-time images and videos are stored in RGB color space, because it is based on the sensitivity of color detection cells in the human visual system. In digital image processing the YCbCr color space is often used in order to take advantage of the lower resolution capability of the human visual system for color with respect to luminosity. Thus, RGB to YCbCr conversion is widely used in image and video processing [1].</p>
+					<p>Given a digital pixel represented in RGB format, 8 bits per sample, where 0 and 255 represents the black and white color, respectively, the YCbCr components can be obtained according to equations (1) to (3):</p>
+					<a href="img/rgb_eq1.svg">
+                        <img class="img-responsive center-block" src="img/rgb_eq1.svg" alt="">
+                    </a>
+					<span class="caption text-muted">Equations (1) to (3): RGB to YCbCr conversion, source: [1]</span>
+					
+					<p>Approximating the equations (1) to (3) to the nearest integer and replacing multiplication and division by shift registers, the equations (4) to (6) are obtained:</p>
+					<a href="img/rgb_eq2.svg">
+                        <img class="img-responsive center-block" src="img/rgb_eq2.svg" alt="">
+                    </a>
+					<span class="caption text-muted">Equations (4) to (6)</span>
+					
+					<p>Image and Video consumes a lot of data. One of the reasons is because they are represented in the RGB format. However, is not worth to store or transmit information in this color space representaion, once it has a large bandwidth. Thus all the pixels should be converted to YCbCr to accomplish that.</p>
+			        
+					<h2 class="section-heading">A practical example</h2>
+					<p>To understand the effect of converting RGB to YCbCr, we will use the Figure (1).</p>
+					
+					<a href="img/rgb.png">
+                        <img class="img-responsive center-block" src="img/rgb.png"  width="200" height="200" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (1): rgb.png</span>
+					<p>Using Matlab or Octave can be done some processing on the image. For example, the code below reads the image file "rgb.png":</p>
+					<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #408080; font-style: italic">% RGB to YCbCr with Matlab</span>
+I = imread(<span style="color: #BA2121">&#39;rgb.png&#39;</span>);
+figure(<span style="color: #666666">1</span>), imshow(I);
+</pre></div>
+
+<span class="caption text-muted">Matlab code to read an image</span>
+                   <p>A color image has three channels (red, green and blue components). To access each component of the image, the Matlab code below can be used:</p>
+                    <!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #408080; font-style: italic">% RGB to YCbCr with Matlab</span>
+R = I(:,:,<span style="color: #666666">1</span>);
+G = I(:,:,<span style="color: #666666">2</span>); 
+B = I(:,:,<span style="color: #666666">3</span>); 
+figure(<span style="color: #666666">2</span>), imshow(R), figure(<span style="color: #666666">3</span>),imshow(G),figure(<span style="color: #666666">4</span>), imshow(B);
+</pre></div>
+                   <span class="caption text-muted">Matlab code to access each channel of the image</span>
+				   <p>Each component of the image can be seen in Figures (2) to (4). Note that each channel has only the each corresponding color.</p>
+				   <a href="img/R.jpg">
+                        <img class="img-responsive center-block" src="img/R.jpg"  width="200" height="200" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (2): the red channel</span>
+					
+					<a href="img/G.jpg">
+                        <img class="img-responsive center-block" src="img/G.jpg"  width="200" height="200" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (3): the green channel</span>
+					<a href="img/B.jpg">
+                        <img class="img-responsive center-block" src="img/B.jpg"  width="200" height="200" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (4): the blue channel</span>
+					<p>The Matlab provides the function <strong>rgb2ycbcr</strong> that converts an image from RGB to YCbCr. The script to convert the image from one space to another and to access each component (Y, Cb and Cr) can be seen below:</p>
+					<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #408080; font-style: italic">% RGB to YCbCr with Matlab</span>
+I2 = rgb2ycbcr(I);
+Y = I2(:,:,<span style="color: #666666">1</span>); 
+Cb = I2(:,:,<span style="color: #666666">2</span>); 
+Cr = I2(:,:,<span style="color: #666666">3</span>); 
+figure(<span style="color: #666666">5</span>),imshow(I2), figure(<span style="color: #666666">6</span>), imshow(Y), figure(<span style="color: #666666">7</span>), imshow(Cb),figure(<span style="color: #666666">8</span>), imshow(Cb);
+</pre></div>
+<span class="caption text-muted">Matlab code to convert from RGB to YCbCr and to access each channel of the converted image</span>
+
+					<p>The converted image in the YCbCr space can be seen in Figure (5). It has three components: the lumminance Y, the blue difference Cb and the red difference Cr.</p>
+					<a href="img/ycbcr.jpg">
+                        <img class="img-responsive center-block" src="img/ycbcr.jpg"  width="200" height="200" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (5): the image in the YCbCr space</span>
+					<p>The Y component only filters the luminance (brightness) of the image (see Figure (6));  the Cb and  Cr components subtract the red and blue colors, respectively, from the image (see Figures (7) and (8)).</p>
+					<a href="img/Y.jpg">
+                        <img class="img-responsive center-block" src="img/Y.jpg"  width="200" height="200" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (6): the Y component</span>
+					<a href="img/Cb.jpg">
+                        <img class="img-responsive center-block" src="img/Cb.jpg"  width="200" height="200" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (7): the Cb component</span>
+					<a href="img/Cr.jpg">
+                        <img class="img-responsive center-block" src="img/Cr.jpg"  width="200" height="200" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (8): the Cr component</span>
+					
+					<h2 class="section-heading">Hardware implementation</h2>
+					<p>The hardware implementation of the RGB to YCbCr converter may be done using equations (4) to (6). The computation is done using only shift registers and adders. Each component is described in Figures (9) to (11).</p>
+					<a href="img/RGB2Y.svg">
+                        <img class="img-responsive center-block" src="img/RGB2Y.svg"  width="400" height="600" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (9): RGB to Y block</span>
+					<a href="img/RGB2Cb.svg">
+                        <img class="img-responsive center-block" src="img/RGB2Cb.svg"  width="400" height="600" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (10): RGB to Cb block</span>
+					<a href="img/RGB2Cr.svg">
+                        <img class="img-responsive center-block" src="img/RGB2Cr.svg"  width="400" height="600" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (11): RGB to Cr block</span>
+					
+					<p>The SystemVerilog implementation of the RGB2YCbCr converter can be seen below:</p>
+					<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">module</span> RGB2YCbCr(rgb_if.in in, ycbcr_if.out out);
+
+   <span style="color: #008000; font-weight: bold">always</span> @(<span style="color: #008000; font-weight: bold">posedge</span> in.clk)<span style="color: #008000; font-weight: bold">begin</span>
+       <span style="color: #008000; font-weight: bold">if</span>(in.rst) <span style="color: #008000; font-weight: bold">begin</span>
+          out.<span style="color: #880000">Y</span> <span style="color: #666666">&lt;=</span> <span style="color: #666666">0</span>;
+          out.Cb <span style="color: #666666">&lt;=</span> <span style="color: #666666">0</span>;
+          out.Cr <span style="color: #666666">&lt;=</span> <span style="color: #666666">0</span>;
+       <span style="color: #008000; font-weight: bold">end</span>
+       <span style="color: #008000; font-weight: bold">else</span> <span style="color: #008000; font-weight: bold">begin</span>
+          out.<span style="color: #880000">Y</span> <span style="color: #666666">&lt;=</span> <span style="color: #666666">16+</span>(((in.<span style="color: #880000">R</span><span style="color: #666666">&lt;&lt;6</span>)<span style="color: #666666">+</span>(in.<span style="color: #880000">R</span><span style="color: #666666">&lt;&lt;1</span>)<span style="color: #666666">+</span>(in.<span style="color: #880000">G</span><span style="color: #666666">&lt;&lt;7</span>)<span style="color: #666666">+</span>in.<span style="color: #880000">G</span><span style="color: #666666">+</span>(in.<span style="color: #880000">B</span><span style="color: #666666">&lt;&lt;4</span>)<span style="color: #666666">+</span>(in.<span style="color: #880000">B</span><span style="color: #666666">&lt;&lt;3</span>)<span style="color: #666666">+</span>in.<span style="color: #880000">B</span>)<span style="color: #666666">&gt;&gt;8</span>);
+          out.Cb <span style="color: #666666">&lt;=</span> <span style="color: #666666">128</span> <span style="color: #666666">+</span> ((<span style="color: #666666">-</span>((in.<span style="color: #880000">R</span><span style="color: #666666">&lt;&lt;5</span>)<span style="color: #666666">+</span>(in.<span style="color: #880000">R</span><span style="color: #666666">&lt;&lt;2</span>)<span style="color: #666666">+</span>(in.<span style="color: #880000">R</span><span style="color: #666666">&lt;&lt;1</span>))<span style="color: #666666">-</span>((in.<span style="color: #880000">G</span><span style="color: #666666">&lt;&lt;6</span>)<span style="color: #666666">+</span>(in.<span style="color: #880000">G</span><span style="color: #666666">&lt;&lt;3</span>)<span style="color: #666666">+</span>(in.<span style="color: #880000">G</span><span style="color: #666666">&lt;&lt;1</span>))<span style="color: #666666">+</span>(in.<span style="color: #880000">B</span><span style="color: #666666">&lt;&lt;7</span>)<span style="color: #666666">-</span>(in.<span style="color: #880000">B</span><span style="color: #666666">&lt;&lt;4</span>))<span style="color: #666666">&gt;&gt;8</span>);
+          out.Cr <span style="color: #666666">&lt;=</span> <span style="color: #666666">128</span> <span style="color: #666666">+</span> (((in.<span style="color: #880000">R</span><span style="color: #666666">&lt;&lt;7</span>)<span style="color: #666666">-</span>(in.<span style="color: #880000">R</span><span style="color: #666666">&lt;&lt;4</span>)<span style="color: #666666">-</span>((in.<span style="color: #880000">G</span><span style="color: #666666">&lt;&lt;6</span>)<span style="color: #666666">+</span>(in.<span style="color: #880000">G</span><span style="color: #666666">&lt;&lt;5</span>)<span style="color: #666666">-</span>(in.<span style="color: #880000">G</span><span style="color: #666666">&lt;&lt;1</span>))<span style="color: #666666">-</span>((in.<span style="color: #880000">B</span><span style="color: #666666">&lt;&lt;4</span>)<span style="color: #666666">+</span>(in.<span style="color: #880000">B</span><span style="color: #666666">&lt;&lt;1</span>)))<span style="color: #666666">&gt;&gt;8</span>);
+       <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">end</span>
+<span style="color: #008000; font-weight: bold">endmodule</span> <span style="color: #666666">:</span> RGB2YCbCr
+</pre></div>
+					<span class="caption text-muted">SystemVerilog code of the RGB2YCbCr converter (RGB2YCbCr.sv)</span>
+					<p>The module of the converter has two interfaces:</p>
+					<ul>
+					<li>The RGB interface <strong>rgb_if</strong>: contains the three components of the RGB pixel, plus the clock and reset signals</li>
+					<li>The YCbCr interface <strong>ycbcr_if</strong>: contains the three components of the YCbCr pixel, plus the clock and reset signals</li>
+					</ul>
+					<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">interface</span> rgb_if(<span style="color: #008000; font-weight: bold">input</span> <span style="color: #008000; font-weight: bold">logic</span> clk, rst);
+    <span style="color: #008000; font-weight: bold">logic</span> [<span style="color: #666666">7:0</span>] <span style="color: #880000">R</span>, <span style="color: #880000">G</span>, <span style="color: #880000">B</span>;
+    
+    <span style="color: #008000; font-weight: bold">modport</span> in(<span style="color: #008000; font-weight: bold">input</span> clk, rst, <span style="color: #880000">R</span>, <span style="color: #880000">G</span>, <span style="color: #880000">B</span>);
+<span style="color: #008000; font-weight: bold">endinterface</span>
+</pre></div>
+			<span class="caption text-muted">SystemVerilog code of the RGB interface (rgb_if.sv)</span>
+			
+			<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">interface</span> ycbcr_if(<span style="color: #008000; font-weight: bold">input</span> clk, rst);
+    <span style="color: #008000; font-weight: bold">logic</span> [<span style="color: #666666">7:0</span>] <span style="color: #880000">Y</span>, Cb, Cr;
+    
+    <span style="color: #008000; font-weight: bold">modport</span> out(<span style="color: #008000; font-weight: bold">input</span> clk, rst, <span style="color: #008000; font-weight: bold">output</span> <span style="color: #880000">Y</span>, Cb, Cr);
+<span style="color: #008000; font-weight: bold">endinterface</span>
+</pre></div>
+			<span class="caption text-muted">SystemVerilog code of the YCbCr interface (ycbcr_if.sv)</span>
+			
+			<p>The SystemVerilog implementation of the testbench of the RGB2YCbCr is shown below. Note that the ROM memory module provides the pixels to stimulate the RGB2YCbCr module.</p>
+
+            <!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;RGB2YCbCr.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;rgb_if.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;ycbcr_if.sv&quot;</span>
+
+<span style="color: #008000; font-weight: bold">parameter</span> <span style="color: #880000">N_ADDR</span> <span style="color: #666666">=</span> <span style="color: #666666">8</span>;
+<span style="color: #008000; font-weight: bold">module</span> <span style="color: #880000">ROM</span>(<span style="color: #008000; font-weight: bold">input</span> <span style="color: #008000; font-weight: bold">logic</span> [<span style="color: #666666">2:0</span>]address, 
+           <span style="color: #008000; font-weight: bold">output</span> <span style="color: #008000; font-weight: bold">logic</span> [<span style="color: #666666">23:0</span>]data);
+   
+   <span style="color: #008000; font-weight: bold">always_comb</span> <span style="color: #008000; font-weight: bold">begin</span>
+     <span style="color: #008000; font-weight: bold">case</span> (address)
+       <span style="color: #666666">00:</span> data <span style="color: #666666">&lt;=</span> <span style="color: #666666">0</span>;
+       <span style="color: #666666">01:</span> data <span style="color: #666666">&lt;=</span> (<span style="color: #666666">123&lt;&lt;16</span>)<span style="color: #666666">+</span>(<span style="color: #666666">88&lt;&lt;8</span>)<span style="color: #666666">+60</span>;
+       <span style="color: #666666">02:</span> data <span style="color: #666666">&lt;=</span> (<span style="color: #666666">100&lt;&lt;16</span>)<span style="color: #666666">+</span>(<span style="color: #666666">200&lt;&lt;8</span>)<span style="color: #666666">+110</span>;
+       <span style="color: #666666">03:</span> data <span style="color: #666666">&lt;=</span> (<span style="color: #666666">50&lt;&lt;16</span>)<span style="color: #666666">+</span>(<span style="color: #666666">50&lt;&lt;8</span>)<span style="color: #666666">+10</span>;
+       <span style="color: #666666">04:</span> data <span style="color: #666666">&lt;=</span> (<span style="color: #666666">251&lt;&lt;16</span>)<span style="color: #666666">+</span>(<span style="color: #666666">135&lt;&lt;8</span>)<span style="color: #666666">+160</span>;
+       <span style="color: #666666">05:</span> data <span style="color: #666666">&lt;=</span> (<span style="color: #666666">185&lt;&lt;16</span>)<span style="color: #666666">+</span>(<span style="color: #666666">69&lt;&lt;8</span>)<span style="color: #666666">+45</span>;
+       <span style="color: #666666">06:</span> data <span style="color: #666666">&lt;=</span> (<span style="color: #666666">196&lt;&lt;16</span>)<span style="color: #666666">+</span>(<span style="color: #666666">188&lt;&lt;8</span>)<span style="color: #666666">+201</span>;
+       <span style="color: #666666">07:</span> data <span style="color: #666666">&lt;=</span> (<span style="color: #666666">132&lt;&lt;16</span>)<span style="color: #666666">+</span>(<span style="color: #666666">168&lt;&lt;8</span>)<span style="color: #666666">+74</span>;
+     <span style="color: #008000; font-weight: bold">endcase</span>
+   <span style="color: #008000; font-weight: bold">end</span>
+<span style="color: #008000; font-weight: bold">endmodule</span>
+
+<span style="color: #008000; font-weight: bold">module</span> top;
+  <span style="color: #008000; font-weight: bold">logic</span> clk;
+  <span style="color: #008000; font-weight: bold">logic</span> rst;
+  <span style="color: #008000; font-weight: bold">logic</span> [<span style="color: #666666">2:0</span>] addr;
+  <span style="color: #008000; font-weight: bold">logic</span> [<span style="color: #666666">23:0</span>] data;
+  <span style="color: #008000; font-weight: bold">int</span> i;
+  
+  <span style="color: #008000; font-weight: bold">initial</span> <span style="color: #008000; font-weight: bold">begin</span>
+    clk <span style="color: #666666">=</span> <span style="color: #666666">0</span>;
+    rst <span style="color: #666666">=</span> <span style="color: #666666">1</span>;
+    #<span style="color: #666666">22</span> rst <span style="color: #666666">=</span> <span style="color: #666666">0</span>;
+     
+    <span style="color: #008000; font-weight: bold">for</span>(i <span style="color: #666666">=</span> <span style="color: #666666">0</span>; i <span style="color: #666666">&lt;=</span> <span style="color: #880000">N_ADDR</span>; i<span style="color: #666666">++</span>)<span style="color: #008000; font-weight: bold">begin</span>
+      @(<span style="color: #008000; font-weight: bold">posedge</span> clk)
+      addr <span style="color: #666666">&lt;=</span> i;
+      in.<span style="color: #880000">R</span> <span style="color: #666666">&lt;=</span> data[<span style="color: #666666">23:16</span>];
+      in.<span style="color: #880000">G</span> <span style="color: #666666">&lt;=</span> data[<span style="color: #666666">15:8</span>];
+      in.<span style="color: #880000">B</span> <span style="color: #666666">&lt;=</span> data[<span style="color: #666666">7:0</span>];
+      <span style="color: #008000">$display</span>(<span style="color: #BA2121">&quot;R = %d G = %d B = %d&quot;</span>, in.<span style="color: #880000">R</span>,in.<span style="color: #880000">G</span>, in.<span style="color: #880000">B</span>);
+      @(<span style="color: #008000; font-weight: bold">posedge</span> clk)
+      <span style="color: #008000">$display</span>(<span style="color: #BA2121">&quot;Y = %d Cb = %d Cr = %d&quot;</span>, out.<span style="color: #880000">Y</span>, out.Cb, out.Cr);
+    <span style="color: #008000; font-weight: bold">end</span>
+    <span style="border: 1px solid #FF0000">$</span>finish();
+  <span style="color: #008000; font-weight: bold">end</span>
+  <span style="color: #008000; font-weight: bold">always</span> #<span style="color: #666666">5</span> clk <span style="color: #666666">=</span> <span style="color: #666666">!</span>clk;
+  
+  rgb_if in(clk, rst);
+  ycbcr_if out(clk, rst);
+  RGB2YCbCr rtl(in, out);
+  <span style="color: #880000">ROM</span> image(.address(addr), .data(data));
+  
+<span style="color: #008000; font-weight: bold">endmodule</span>
+</pre></div>
+			<span class="caption text-muted">SystemVerilog code of the RGB2YCbCr testbench (top.sv)</span>
+			
+			<p>Also available in <a href="https://github.com/nelsoncsc/sv_image/tree/master/RGB2YCbCr">GitHub</a>. </p>
+
+					<h2 class="section-heading">References</h2>
+					<p>[1] Keith Jack. Video demystified: a handbook for the digital engineer. Elsevier, 2011</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelsoncscampos@gmail.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://br.linkedin.com/in/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-circle fa-linkedin-color fa-stack-2x stacked-line-height"></i>
+                                    <i class="fa fa-linkedin fa-stack-1x fa-inverse stacked-line-height-2"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2016</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- jQuery -->
+    <script src="js/jquery.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+
+    <!-- Custom Theme JavaScript -->
+    <script src="js/clean-blog.min.js"></script>
+
+</body>
+
+</html>

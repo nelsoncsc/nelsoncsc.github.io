@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+ 
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+ 
+</script>
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - A basic tutorial of UVM Connect">
+    <meta name="keywords" content="hardware, functional verification, UVM, SystemC, Octave, Matlab, algorithm, Digital Signal Processing, Makefile, hello world, TLM, FIFO, SystemVerilog">
+    <meta name="author" content="Nelson Campos">
+	
+	
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>A Basic Tutorial to Connect Octave with UVM</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <!-- Custom Fonts -->
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="about.html">About</a>
+                    </li>
+                    <li>
+                        <a href="peasant.html">Peasant</a>
+                    </li>
+                </ul>
+            </div>
+            <!-- /.navbar-collapse -->
+        </div>
+        <!-- /.container -->
+    </nav>
+
+    <!-- Page Header -->
+    <!-- Set your background image for this header on the line below. -->
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>A Basic Tutorial to Connect Octave with UVM</h1>
+                        <h2 class="subheading">Integrating Octave into SystemC and UVM</h2>
+                        <span class="meta">Posted by <a href="about.html">Nelson Campos</a> on November 26, 2016</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Post Content -->
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <p>Octave is a software that provides a high-level programming language for numerical computation. Its syntax is quite similar to MATLAB and their scripts are compatible to run in both MATALB and Octave.</p>
+
+                    <p>When there is a need to verify complex RTL with expensive numerical computations and reduce the time to market, Octave may be integrated into SystemC and UVM, providing vast libraries for Digital Signal Processing, Statistics, Communcation, etc [1].</p>
+					
+                    <p>In the previous post about <a href="basic_uvmc.html">UVM Connect</a>, was shown how to verify a SystemC reference model with another reference model also in SystemC. Suppose now that we want to check our reference model with two other models (a SystemC model already present in the previous <a href="img/basic_uvmc.svg">UVM Testbench</a> and a reference model written in Octave). The testbench of this sctructure can be seen in Figure 1.</p>
+
+					<a href="img/basic_uvmc_oct.svg">
+                        <img class="img-responsive center-block" src="img/basic_uvmc_oct.svg"  width="800" height="1000" alt="">
+                    </a>
+					<span class="caption text-muted">Figure 1 - A simple testbench with three refmods</span>
+
+                    <p>The operation of refmods is quite simple: it only throws in the output a string that comes from the input. Note that the <strong>refmod_oct</strong> is written in SystemC but it calls a function <strong>reffunc.m</strong> written in Octave as illustrated in Figure 2.</p>
+
+<a href="img/call_sc_oct.svg">
+                        <img class="img-responsive center-block" src="img/call_sc_oct.svg"  width="400" height="400" alt="">
+                    </a>
+					<span class="caption text-muted">Figure 2 - Octave function called in a SystemC module</span>
+				
+                        <p>The codes of the <strong>refmod_oct.cpp</strong> and <strong>reffunc.m</strong> can be seen below. Note that the headers <strong>systemc.h</strong> and <strong>tlm.h</strong> were not included because this was done in the <strong>refmod.cpp</strong>.</p>
+
+<!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #557799">#include &lt;octave/oct.h&gt;</span>
+<span style="color: #557799">#include &lt;octave/octave.h&gt;</span>
+<span style="color: #557799">#include &lt;octave/parse.h&gt;</span>
+<span style="color: #557799">#include &lt;octave/toplev.h&gt;</span>
+
+SC_MODULE(refmod_oct) {
+  sc_port<span style="color: #333333">&lt;</span>tlm_get_peek_if<span style="color: #333333">&lt;</span>tr<span style="color: #333333">&gt;</span> <span style="color: #333333">&gt;</span> in;
+  sc_port<span style="color: #333333">&lt;</span>tlm_put_if<span style="color: #333333">&lt;</span>tr<span style="color: #333333">&gt;</span> <span style="color: #333333">&gt;</span> out;
+
+  <span style="color: #333399; font-weight: bold">void</span> <span style="color: #0066BB; font-weight: bold">p</span>() {
+    string_vector oct_argv (<span style="color: #0000DD; font-weight: bold">2</span>);
+    oct_argv(<span style="color: #0000DD; font-weight: bold">0</span>) <span style="color: #333333">=</span> <span style="background-color: #fff0f0">&quot;embedded&quot;</span>;
+    oct_argv(<span style="color: #0000DD; font-weight: bold">1</span>) <span style="color: #333333">=</span> <span style="background-color: #fff0f0">&quot;-q&quot;</span>;
+    octave_function <span style="color: #333333">*</span>oct_fcn;
+    octave_value_list oct_in, oct_out;
+    oct_fcn <span style="color: #333333">=</span> load_fcn_from_file(<span style="background-color: #fff0f0">&quot;reffunc.m&quot;</span>);
+    <span style="color: #008800; font-weight: bold">if</span>(oct_fcn) cout <span style="color: #333333">&lt;&lt;</span> <span style="background-color: #fff0f0">&quot;Info: SystemC: Octave function loaded.&quot;</span> <span style="color: #333333">&lt;&lt;</span> endl;
+    <span style="color: #008800; font-weight: bold">else</span> sc_stop();
+   
+    tr tr;
+    <span style="color: #008800; font-weight: bold">while</span>(<span style="color: #0000DD; font-weight: bold">1</span>){
+      tr <span style="color: #333333">=</span> in<span style="color: #333333">-&gt;</span>get();
+      octave_idx_type i <span style="color: #333333">=</span> <span style="color: #0000DD; font-weight: bold">0</span>;
+      oct_in(i) <span style="color: #333333">=</span> octave_value (tr.message);
+      oct_out <span style="color: #333333">=</span> feval(oct_fcn, oct_in);
+      tr.message <span style="color: #333333">=</span> oct_out(<span style="color: #0000DD; font-weight: bold">0</span>).string_value ();
+      cout <span style="color: #333333">&lt;&lt;</span><span style="background-color: #fff0f0">&quot;refmod_oct: &quot;</span> <span style="color: #333333">&lt;&lt;</span>tr.message <span style="color: #333333">&lt;&lt;</span><span style="background-color: #fff0f0">&quot;</span><span style="color: #666666; font-weight: bold; background-color: #fff0f0">\n</span><span style="background-color: #fff0f0">&quot;</span>;
+      out<span style="color: #333333">-&gt;</span>put(tr);
+    }
+  }
+  SC_CTOR(refmod_oct)<span style="color: #333333">:</span> in(<span style="background-color: #fff0f0">&quot;in&quot;</span>), out(<span style="background-color: #fff0f0">&quot;out&quot;</span>) { SC_THREAD(p); }
+};
+</pre></div>
+
+<span class="caption text-muted">SystemC module (<strong>refmod_oct.cpp</strong>) calling Octave Function (<strong>reffunc.m</strong>)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">function</span><span style="color: #bbbbbb"> </span>f =<span style="color: #bbbbbb"> </span><span style="color: #0066BB; font-weight: bold">reffunc</span>(a)<span style="color: #bbbbbb"></span>
+<span style="color: #bbbbbb">  </span>f = a;
+<span style="color: #008800; font-weight: bold">end</span>
+</pre></div>
+<span class="caption text-muted">Octave Function (<strong>reffunc.m</strong>) that simply passes the input to the output</span>
+
+<p>The codes of the environment (<strong>env.sv</strong>), where the connections of the modules are present can be seen below.</p>
+
+<!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #003366; font-weight: bold">`include</span> <span style="background-color: #fff0f0">&quot;comparator.sv&quot;</span>
+ 
+<span style="color: #008800; font-weight: bold">class</span> env <span style="color: #008800; font-weight: bold">extends</span> uvm_env;
+    sequencer sqr;
+    path_tr path;
+    comparator #(packet_out) comp;
+
+    uvm_tlm_analysis_fifo #(packet_in) to_refmod;
+    uvm_tlm_analysis_fifo #(packet_in) to_refmod_low;
+    uvm_tlm_analysis_fifo #(packet_in) to_refmod_oct;
+
+    <span style="color: #003366; font-weight: bold">`uvm_component_utils</span>(env)
+
+    <span style="color: #008800; font-weight: bold">function</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="color: #008800; font-weight: bold">string</span> name, uvm_component parent <span style="color: #333333">=</span> <span style="color: #008800; font-weight: bold">null</span>);
+        <span style="color: #008800; font-weight: bold">super</span>.<span style="color: #008800; font-weight: bold">new</span>(name, parent);       
+        to_refmod <span style="color: #333333">=</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="background-color: #fff0f0">&quot;to_refmod&quot;</span>, <span style="color: #008800; font-weight: bold">this</span>);
+        to_refmod_low <span style="color: #333333">=</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="background-color: #fff0f0">&quot;to_refmod_low&quot;</span>, <span style="color: #008800; font-weight: bold">this</span>);
+        to_refmod_oct <span style="color: #333333">=</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="background-color: #fff0f0">&quot;to_refmod_oct&quot;</span>, <span style="color: #008800; font-weight: bold">this</span>);
+    <span style="color: #008800; font-weight: bold">endfunction</span>
+
+    <span style="color: #008800; font-weight: bold">virtual</span> <span style="color: #008800; font-weight: bold">function</span> <span style="color: #008800; font-weight: bold">void</span> build_phase(uvm_phase phase);
+        <span style="color: #008800; font-weight: bold">super</span>.build_phase(phase);
+        sqr <span style="color: #333333">=</span> sequencer<span style="color: #333333">::</span>type_id<span style="color: #333333">::</span>create(<span style="background-color: #fff0f0">&quot;sqr&quot;</span>, <span style="color: #008800; font-weight: bold">this</span>);
+        path <span style="color: #333333">=</span> path_tr<span style="color: #333333">::</span>type_id<span style="color: #333333">::</span>create(<span style="background-color: #fff0f0">&quot;path&quot;</span>, <span style="color: #008800; font-weight: bold">this</span>);
+        comp <span style="color: #333333">=</span> comparator #(packet_out)<span style="color: #333333">::</span>type_id<span style="color: #333333">::</span>create(<span style="background-color: #fff0f0">&quot;comp&quot;</span>, <span style="color: #008800; font-weight: bold">this</span>);
+    <span style="color: #008800; font-weight: bold">endfunction</span>
+
+    <span style="color: #008800; font-weight: bold">virtual</span> <span style="color: #008800; font-weight: bold">function</span> <span style="color: #008800; font-weight: bold">void</span> connect_phase(uvm_phase phase);
+        path.seq_item_port.connect(sqr.seq_item_export);
+        path.item_collected_port.connect(to_refmod.analysis_export);
+        uvmc_tlm1 #(packet_in)<span style="color: #333333">::</span>connect(to_refmod.get_export, <span style="background-color: #fff0f0">&quot;refmod_i.in&quot;</span>);
+
+        path.item_collected_port.connect(to_refmod_low.analysis_export);
+        uvmc_tlm1 #(packet_in)<span style="color: #333333">::</span>connect(to_refmod_low.get_export, <span style="background-color: #fff0f0">&quot;refmod_low_i.in&quot;</span>);
+        
+        path.item_collected_port.connect(to_refmod_oct.analysis_export);
+        uvmc_tlm1 #(packet_in)<span style="color: #333333">::</span>connect(to_refmod_oct.get_export, <span style="background-color: #fff0f0">&quot;refmod_oct_i.in&quot;</span>);
+    <span style="color: #008800; font-weight: bold">endfunction</span>
+
+    <span style="color: #008800; font-weight: bold">virtual</span> <span style="color: #008800; font-weight: bold">function</span> <span style="color: #008800; font-weight: bold">void</span> end_of_elaboration_phase(uvm_phase phase);
+        <span style="color: #008800; font-weight: bold">super</span>.end_of_elaboration_phase(phase);
+    <span style="color: #008800; font-weight: bold">endfunction</span>
+  
+<span style="color: #008800; font-weight: bold">endclass</span>
+</pre></div>
+<span class="caption text-muted">(<strong>env.sv</strong>)</span>
+                     <p>The comparator class compares the transactions coming from the <strong>refmod</strong> with the <strong>refmod_low</strong> and <strong>refmod_oct</strong> transactions and its SystemVerilog code can be seen below.</p>
+			
+<!-- HTML generated using hilite.me --><div style="background: #ffffff; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008800; font-weight: bold">class</span> comparator #(<span style="color: #008800; font-weight: bold">type</span> <span style="color: #003366; font-weight: bold">T</span> <span style="color: #333333">=</span> packet_in) <span style="color: #008800; font-weight: bold">extends</span> uvm_scoreboard;
+   <span style="color: #008800; font-weight: bold">typedef</span> comparator #(<span style="color: #003366; font-weight: bold">T</span>) this_type;
+   <span style="color: #003366; font-weight: bold">`uvm_component_utils</span>(this_type)
+    
+    uvm_tlm_fifo #(<span style="color: #003366; font-weight: bold">T</span>) from_refmod;
+    uvm_tlm_fifo#(<span style="color: #003366; font-weight: bold">T</span>) from_refmod_low;    
+    uvm_tlm_fifo#(<span style="color: #003366; font-weight: bold">T</span>) from_refmod_oct;
+    
+     <span style="color: #003366; font-weight: bold">T</span> tr1, tr2, tr3;
+     <span style="color: #008800; font-weight: bold">int</span> match, mismatch;
+
+    <span style="color: #008800; font-weight: bold">function</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="color: #008800; font-weight: bold">string</span> name, uvm_component parent);
+      <span style="color: #008800; font-weight: bold">super</span>.<span style="color: #008800; font-weight: bold">new</span>(name, parent);
+      from_refmod <span style="color: #333333">=</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="background-color: #fff0f0">&quot;from_refmod&quot;</span>, <span style="color: #008800; font-weight: bold">null</span>, <span style="color: #005588; font-weight: bold">1</span>); 
+      from_refmod_low <span style="color: #333333">=</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="background-color: #fff0f0">&quot;from_refmod_low&quot;</span>, <span style="color: #008800; font-weight: bold">null</span>, <span style="color: #005588; font-weight: bold">1</span>);
+      from_refmod_oct <span style="color: #333333">=</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="background-color: #fff0f0">&quot;from_refmod_oct&quot;</span>, <span style="color: #008800; font-weight: bold">null</span>, <span style="color: #005588; font-weight: bold">1</span>);
+      tr1 <span style="color: #333333">=</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="background-color: #fff0f0">&quot;tr1&quot;</span>);
+      tr2 <span style="color: #333333">=</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="background-color: #fff0f0">&quot;tr2&quot;</span>);
+      tr3 <span style="color: #333333">=</span> <span style="color: #008800; font-weight: bold">new</span>(<span style="background-color: #fff0f0">&quot;tr3&quot;</span>);
+    <span style="color: #008800; font-weight: bold">endfunction</span>
+ 
+    <span style="color: #008800; font-weight: bold">function</span> <span style="color: #008800; font-weight: bold">void</span> connect_phase(uvm_phase phase);
+        uvmc_tlm1 #(<span style="color: #003366; font-weight: bold">T</span>)<span style="color: #333333">::</span>connect(from_refmod.put_export, <span style="background-color: #fff0f0">&quot;refmod_i.out&quot;</span>);
+        uvmc_tlm1#(<span style="color: #003366; font-weight: bold">T</span>)<span style="color: #333333">::</span>connect(from_refmod_low.put_export, <span style="background-color: #fff0f0">&quot;refmod_low_i.out&quot;</span>);
+        uvmc_tlm1#(<span style="color: #003366; font-weight: bold">T</span>)<span style="color: #333333">::</span>connect(from_refmod_oct.put_export, <span style="background-color: #fff0f0">&quot;refmod_oct_i.out&quot;</span>);
+    <span style="color: #008800; font-weight: bold">endfunction</span><span style="color: #333333">:</span> connect_phase
+   
+    <span style="color: #008800; font-weight: bold">task</span> run_phase(uvm_phase phase);
+      <span style="color: #008800; font-weight: bold">forever</span> <span style="color: #008800; font-weight: bold">begin</span>
+        from_refmod.get(tr1);
+        from_refmod_low.get(tr2);
+        from_refmod_oct.get(tr3);
+        compare();
+      <span style="color: #008800; font-weight: bold">end</span>
+    <span style="color: #008800; font-weight: bold">endtask</span><span style="color: #333333">:</span> run_phase
+
+    <span style="color: #008800; font-weight: bold">virtual</span> <span style="color: #008800; font-weight: bold">function</span> <span style="color: #008800; font-weight: bold">void</span> compare();
+      <span style="color: #008800; font-weight: bold">if</span>(tr1.message <span style="color: #333333">==</span> tr2.message <span style="color: #333333">&amp;&amp;</span> tr1.message <span style="color: #333333">==</span> tr3.message) <span style="color: #008800; font-weight: bold">begin</span>
+        <span style="color: #007020">$display</span>(<span style="background-color: #fff0f0">&quot;Comparator MATCH with 2 refmods (refmod == refmod_low == refmod_oct)&quot;</span>);
+        match<span style="color: #333333">++</span>;
+      <span style="color: #008800; font-weight: bold">end</span>
+      <span style="color: #008800; font-weight: bold">else</span> <span style="color: #008800; font-weight: bold">if</span>(tr1.message <span style="color: #333333">==</span> tr2.message) <span style="color: #008800; font-weight: bold">begin</span>
+        <span style="color: #007020">$display</span>(<span style="background-color: #fff0f0">&quot;Comparator MATCH with refmod_low (refmod == refmod_low)&quot;</span>);
+        match<span style="color: #333333">++</span>;
+      <span style="color: #008800; font-weight: bold">end</span>
+      <span style="color: #008800; font-weight: bold">else</span> <span style="color: #008800; font-weight: bold">if</span>(tr1.message <span style="color: #333333">==</span> tr3.message) <span style="color: #008800; font-weight: bold">begin</span>
+        <span style="color: #007020">$display</span>(<span style="background-color: #fff0f0">&quot;Comparator MATCH with refmod_oct (refmod == refmod_oct)&quot;</span>);
+        match<span style="color: #333333">++</span>;
+      <span style="color: #008800; font-weight: bold">end</span>
+      <span style="color: #008800; font-weight: bold">else</span> <span style="color: #008800; font-weight: bold">begin</span>
+        <span style="color: #007020">$display</span>(<span style="background-color: #fff0f0">&quot;Comparator MISMATCH&quot;</span>);
+        mismatch<span style="color: #333333">++</span>;
+      <span style="color: #008800; font-weight: bold">end</span>
+    <span style="color: #008800; font-weight: bold">endfunction</span><span style="color: #333333">:</span> compare
+   
+<span style="color: #008800; font-weight: bold">endclass</span><span style="color: #333333">:</span> comparator
+</pre></div>
+
+
+
+<span class="caption text-muted">(<strong>comparator.sv</strong>)</span>
+
+<p>You can clone or download the full repository ot this testbench with a Makefile for Synopsys tools in <a href="https://github.com/nelsoncsc/basic_uvmc_oct">GitHub</a>. </p>
+
+
+
+					<h2 class="section-heading">References</h2>
+					<p>[1] How to Connect SystemVerilog with Octave. http://www.amiq.com/consulting/2014/11/21/how-to-connect-systemverilog-with-octave/</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelsoncscampos@gmail.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://br.linkedin.com/in/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-circle fa-linkedin-color fa-stack-2x stacked-line-height"></i>
+                                    <i class="fa fa-linkedin fa-stack-1x fa-inverse stacked-line-height-2"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2016</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- jQuery -->
+    <script src="js/jquery.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+
+    <!-- Custom Theme JavaScript -->
+    <script src="js/clean-blog.min.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - A basic tutorial of UVM">
+    <meta name="keywords" content="hardware, functional verification, UVM, algorithm, DPI, Makefile, simple adder, driver, monitor, dve, SystemVerilog">
+    <meta name="author" content="Nelson Campos">
+	
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>A Basic Tutorial of UVM</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <!-- Custom Fonts -->
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="about.html">About</a>
+                    </li>
+                    <li>
+                        <a href="peasant.html">Peasant</a>
+                    </li>
+                </ul>
+            </div>
+            <!-- /.navbar-collapse -->
+        </div>
+        <!-- /.container -->
+    </nav>
+
+    <!-- Page Header -->
+    <!-- Set your background image for this header on the line below. -->
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>A Basic Tutorial of UVM</h1>
+                        <h2 class="subheading">An Introduction to Functional Verification</h2>
+                        <span class="meta">Posted by <a href="about.html">Nelson Campos</a> on September 11, 2016</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Post Content -->
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <p>The Universal Verification Methodology (UVM) has become the standard for verification of integrated circuits design. The UVM class library facilitates the implementation of testbenches. Each element of a UVM testbench is a component derived from an existing UVM class.</p>
+					<p>Each class has simulation phases that are ordered execution steps implemented as methods. The most important UVM phases are:</p>
+					
+					<ul>
+					<li> the <i>build_phase</i> is responsible for the creation and configuration of the testbench structure constructing the components of the hierarchy
+					<li> the <i>connect_phase</i> is used to connect different sub components in a class
+					<li> the <i>run_phase</i> is the main phase, where the simulation is executed
+					<li> the <i>report_phase</i> can be used to display results from the simulation
+					</ul>
+					
+					<p>To implement some important methods in classes and variables, UVM provides the UVM Macros. The most common UVM macros are:</p>
+					<ul> 
+					<li> <i>uvm_component_utils</i>: registers a new class type when the class derives from the class <i>uvm_component</i>
+					<li> <i>uvm_object_utils</i>: similar to <i>uvm_component_utils</i>, but the class is derived from the class <i>uvm_object</i>
+					<li> <i>uvm_field_int</i>: registers a variable in the UVM factory. This macro provides functions like copy(), compare() and print()
+					<li> <i>uvm_info</i>: prints messages during simulation time in the environment
+					<li> <i>uvm_error</i>: this macro sends messages with error logs
+					</ul>
+					<p>To explain the structure of a UVM environment a simple adder will be used as the Design Under Test (DUT) in our case study. The UVM testbench is
+illustrated in Figure (1). The DUT is the hardware implementation that interacts with the testbench in order to verify its functionality.</p>
+					<a href="img/testbench.svg">
+                        <img class="img-responsive center-block" src="img/testbench.svg" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (1): UVM testbench </span>
+					
+					<p>To stimulate the DUT, a class named <i>sequencer</i> generates sequences of data to be transmitted to the DUT. Since the <i>sequencer</i> sends
+transactions (packets of data in a high level of abstraction) and the DUT only understands the data
+coming from the interface, a class called <i>driver</i> converts packets of data  to signals feeding the DUT.</p>
+                   
+				   <p>The data crossing the interface should be captured for a later validation of the stimuli. 
+				      Since the driver only converts transactions to signals, another block performs the inverse function of the driver. 
+					  The monitor is a component that reads the communication between the driver and the DUT and retrieves the transaction. The class <i>monitor</i> reads the data on the interface and converts it into transaction to be compared with the reference model.</p>
+                    <p>The reference model (<i>refmod</i>) is a model conceived in an early phase, before the RTL implementation, assumed as ideal. It simulates the DUT at a high level of abstraction.</p>
+					
+					<p>An <i>agent</i> is a class that typically contains three components: a <i>sequencer</i>, a <i>driver</i> and a <i>monitor</i>. There are two types of agents: Active Agent, which contains all the three components and the Passive Agent, which only contains the monitor and the driver. The agent contains functions for the build phase to create hierarchies and for the connect phase to connect the components.</p>
+                    
+					<p>A <i>comparator</i> is a class that compares data between the reference model and the DUT. The reference model and the comparator form the scoreboard that checks whether the transactions produced by the DUT are correct or not. One or more agents and the scoreboard form the Environment class <i>env</i>. The <i>test</i> class is responsible for performing the tests creating the environment and connecting the <i>sequence</i> to the <i>sequencer</i>. And finally, the <i>top</i> module  instantiates the DUT and the testbench.</p>					
+					
+					<h2 class="section-heading">Learning in a practical way</h2>
+					<p>The functional verification of the adder module will be divided into the following modules and classes:</p>
+					
+					<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">interface</span> input_if(<span style="color: #008000; font-weight: bold">input</span> clk, rst);
+    <span style="color: #008000; font-weight: bold">logic</span> [<span style="color: #666666">31:0</span>] <span style="color: #880000">A</span>, <span style="color: #880000">B</span>;
+    <span style="color: #008000; font-weight: bold">logic</span> valid, ready;
+    
+    <span style="color: #008000; font-weight: bold">modport</span> port(<span style="color: #008000; font-weight: bold">input</span> clk, rst, <span style="color: #880000">A</span>, <span style="color: #880000">B</span>, valid, <span style="color: #008000; font-weight: bold">output</span> ready);
+<span style="color: #008000; font-weight: bold">endinterface</span>
+</pre></div>
+<span class="caption text-muted">Input interface of the adder (input_if.sv)</span>
+
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">interface</span> output_if(<span style="color: #008000; font-weight: bold">input</span> clk, rst);
+    <span style="color: #008000; font-weight: bold">logic</span> [<span style="color: #666666">31:0</span>] data;
+    <span style="color: #008000; font-weight: bold">logic</span> valid, ready;
+    
+    <span style="color: #008000; font-weight: bold">modport</span> port(<span style="color: #008000; font-weight: bold">input</span> clk, rst, <span style="color: #008000; font-weight: bold">output</span> valid, data, ready);
+<span style="color: #008000; font-weight: bold">endinterface</span>
+</pre></div>
+
+<span class="caption text-muted">Output interface of the adder (output_if.sv)</span>
+
+					
+					<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">module</span> adder(input_if.port inter, output_if.port out_inter, <span style="color: #008000; font-weight: bold">output</span> state);
+    <span style="color: #008000; font-weight: bold">enum</span> <span style="color: #008000; font-weight: bold">logic</span> [<span style="color: #666666">1:0</span>] {<span style="color: #880000">INITIAL</span>,<span style="color: #880000">WAIT</span>,<span style="color: #880000">SEND</span>} state;
+    
+    <span style="color: #008000; font-weight: bold">always_ff</span> @(<span style="color: #008000; font-weight: bold">posedge</span> inter.clk)
+        <span style="color: #008000; font-weight: bold">if</span>(inter.rst) <span style="color: #008000; font-weight: bold">begin</span>
+            inter.ready <span style="color: #666666">&lt;=</span> <span style="color: #666666">0</span>;
+            out_inter.data <span style="color: #666666">&lt;=</span> <span style="color: #666666">&#39;x</span>;
+            out_inter.valid <span style="color: #666666">&lt;=</span> <span style="color: #666666">0</span>;
+            state <span style="color: #666666">&lt;=</span> <span style="color: #880000">INITIAL</span>;
+        <span style="color: #008000; font-weight: bold">end</span>
+        <span style="color: #008000; font-weight: bold">else</span> <span style="color: #008000; font-weight: bold">case</span>(state)
+                <span style="color: #A0A000">INITIAL:</span> <span style="color: #008000; font-weight: bold">begin</span>
+                    inter.ready <span style="color: #666666">&lt;=</span> <span style="color: #666666">1</span>;
+                    state <span style="color: #666666">&lt;=</span> <span style="color: #880000">WAIT</span>;
+                <span style="color: #008000; font-weight: bold">end</span>
+                
+                <span style="color: #A0A000">WAIT:</span> <span style="color: #008000; font-weight: bold">begin</span>
+                    <span style="color: #008000; font-weight: bold">if</span>(inter.valid) <span style="color: #008000; font-weight: bold">begin</span>
+                        inter.ready <span style="color: #666666">&lt;=</span> <span style="color: #666666">0</span>;
+                        out_inter.data <span style="color: #666666">&lt;=</span> inter.<span style="color: #880000">A</span> <span style="color: #666666">+</span> inter.<span style="color: #880000">B</span>;
+                        out_inter.valid <span style="color: #666666">&lt;=</span> <span style="color: #666666">1</span>;
+                        state <span style="color: #666666">&lt;=</span> <span style="color: #880000">SEND</span>;
+                    <span style="color: #008000; font-weight: bold">end</span>
+                <span style="color: #008000; font-weight: bold">end</span>
+                
+                <span style="color: #A0A000">SEND:</span> <span style="color: #008000; font-weight: bold">begin</span>
+                    <span style="color: #008000; font-weight: bold">if</span>(out_inter.ready) <span style="color: #008000; font-weight: bold">begin</span>
+                        out_inter.valid <span style="color: #666666">&lt;=</span> <span style="color: #666666">0</span>;
+                        inter.ready <span style="color: #666666">&lt;=</span> <span style="color: #666666">1</span>;
+                        state <span style="color: #666666">&lt;=</span> <span style="color: #880000">WAIT</span>;
+                    <span style="color: #008000; font-weight: bold">end</span>
+                <span style="color: #008000; font-weight: bold">end</span>
+        <span style="color: #008000; font-weight: bold">endcase</span>
+<span style="color: #008000; font-weight: bold">endmodule</span><span style="color: #666666">:</span> adder
+</pre></div>
+<span class="caption text-muted">SystemVerilog code for the DUT (adder.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> packet_in <span style="color: #008000; font-weight: bold">extends</span> uvm_sequence_item;
+    <span style="color: #008000; font-weight: bold">rand</span> <span style="color: #008000; font-weight: bold">integer</span> <span style="color: #880000">A</span>;
+    <span style="color: #008000; font-weight: bold">rand</span> <span style="color: #008000; font-weight: bold">integer</span> <span style="color: #880000">B</span>;
+
+    <span style="color: #880000">`uvm_object_utils_begin</span>(packet_in)
+        <span style="color: #880000">`uvm_field_int</span>(<span style="color: #880000">A</span>, <span style="color: #880000">UVM_ALL_ON</span><span style="color: #666666">|</span><span style="color: #880000">UVM_HEX</span>)
+        <span style="color: #880000">`uvm_field_int</span>(<span style="color: #880000">B</span>, <span style="color: #880000">UVM_ALL_ON</span><span style="color: #666666">|</span><span style="color: #880000">UVM_HEX</span>)
+    <span style="color: #880000">`uvm_object_utils_end</span>
+
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name<span style="color: #666666">=</span><span style="color: #BA2121">&quot;packet_in&quot;</span>);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name);
+    <span style="color: #008000; font-weight: bold">endfunction</span><span style="color: #666666">:</span> <span style="color: #008000; font-weight: bold">new</span>
+<span style="color: #008000; font-weight: bold">endclass</span><span style="color: #666666">:</span> packet_in
+</pre></div>
+<span class="caption text-muted">Input transaction with random values for the adder inputs  (packet_in.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> packet_out <span style="color: #008000; font-weight: bold">extends</span> uvm_sequence_item;
+    <span style="color: #008000; font-weight: bold">rand</span> <span style="color: #008000; font-weight: bold">integer</span> data;
+
+    <span style="color: #880000">`uvm_object_utils_begin</span>(packet_out)
+        <span style="color: #880000">`uvm_field_int</span>(data, <span style="color: #880000">UVM_ALL_ON</span><span style="color: #666666">|</span><span style="color: #880000">UVM_HEX</span>)
+    <span style="color: #880000">`uvm_object_utils_end</span>
+
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name<span style="color: #666666">=</span><span style="color: #BA2121">&quot;packet_out&quot;</span>);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name);
+    <span style="color: #008000; font-weight: bold">endfunction</span><span style="color: #666666">:</span> <span style="color: #008000; font-weight: bold">new</span>
+<span style="color: #008000; font-weight: bold">endclass</span><span style="color: #666666">:</span> packet_out
+</pre></div>
+<span class="caption text-muted">Output transaction to compare stimuli on the comparator (packet_out.sv)</span>
+					
+					<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> sequence_in <span style="color: #008000; font-weight: bold">extends</span> uvm_sequence #(packet_in);
+    <span style="color: #880000">`uvm_object_utils</span>(sequence_in)
+
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name<span style="color: #666666">=</span><span style="color: #BA2121">&quot;sequence_in&quot;</span>);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name);
+    <span style="color: #008000; font-weight: bold">endfunction</span><span style="color: #666666">:</span> <span style="color: #008000; font-weight: bold">new</span>
+
+    <span style="color: #008000; font-weight: bold">task</span> body;
+        packet_in tx;
+
+        <span style="color: #008000; font-weight: bold">forever</span> <span style="color: #008000; font-weight: bold">begin</span>
+            tx <span style="color: #666666">=</span> packet_in<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;tx&quot;</span>);
+            start_item(tx);
+            <span style="color: #008000; font-weight: bold">assert</span>(tx.randomize());
+            finish_item(tx);
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endtask</span><span style="color: #666666">:</span> body
+<span style="color: #008000; font-weight: bold">endclass</span><span style="color: #666666">:</span> sequence_in
+</pre></div>
+<span class="caption text-muted">Sequence that generates the input transactions (sequence_in.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> sequencer <span style="color: #008000; font-weight: bold">extends</span> uvm_sequencer #(packet_in);
+    <span style="color: #880000">`uvm_component_utils</span>(sequencer)
+
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span> (<span style="color: #008000; font-weight: bold">string</span> name <span style="color: #666666">=</span> <span style="color: #BA2121">&quot;sequencer&quot;</span>, uvm_component parent <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">null</span>);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+<span style="color: #008000; font-weight: bold">endclass</span><span style="color: #666666">:</span> sequencer
+</pre></div>
+<span class="caption text-muted">Sequencer that gives transactions from the sequence to the driver (sequencer.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">typedef</span> <span style="color: #008000; font-weight: bold">virtual</span> input_if input_vif;
+
+<span style="color: #008000; font-weight: bold">class</span> driver <span style="color: #008000; font-weight: bold">extends</span> uvm_driver #(packet_in);
+    <span style="color: #880000">`uvm_component_utils</span>(driver)
+    input_vif vif;
+    <span style="color: #008000; font-weight: bold">event</span> begin_record, end_record;
+
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name <span style="color: #666666">=</span> <span style="color: #BA2121">&quot;driver&quot;</span>, uvm_component parent <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">null</span>);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> build_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.build_phase(phase);
+        <span style="color: #008000; font-weight: bold">assert</span>(uvm_config_db#(input_vif)<span style="color: #666666">::</span>get(<span style="color: #008000; font-weight: bold">this</span>, <span style="color: #BA2121">&quot;&quot;</span>, <span style="color: #BA2121">&quot;vif&quot;</span>, vif));
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> run_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.run_phase(phase);
+        <span style="color: #008000; font-weight: bold">fork</span>
+            reset_signals();
+            get_and_drive(phase);
+            record_tr();
+        <span style="color: #008000; font-weight: bold">join</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">protected</span> <span style="color: #008000; font-weight: bold">task</span> reset_signals();
+        <span style="color: #008000; font-weight: bold">wait</span> (vif.rst <span style="color: #666666">===</span> <span style="color: #666666">1</span>);
+        <span style="color: #008000; font-weight: bold">forever</span> <span style="color: #008000; font-weight: bold">begin</span>
+            vif.valid <span style="color: #666666">&lt;=</span> <span style="color: #666666">&#39;0</span>;
+            vif.<span style="color: #880000">A</span> <span style="color: #666666">&lt;=</span> <span style="color: #666666">&#39;x</span>;
+            vif.<span style="color: #880000">B</span> <span style="color: #666666">&lt;=</span> <span style="color: #666666">&#39;x</span>;
+            @(<span style="color: #008000; font-weight: bold">posedge</span> vif.rst);
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">protected</span> <span style="color: #008000; font-weight: bold">task</span> get_and_drive(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">wait</span>(vif.rst <span style="color: #666666">===</span> <span style="color: #666666">1</span>);
+        @(<span style="color: #008000; font-weight: bold">negedge</span> vif.rst);
+        @(<span style="color: #008000; font-weight: bold">posedge</span> vif.clk);
+        
+        <span style="color: #008000; font-weight: bold">forever</span> <span style="color: #008000; font-weight: bold">begin</span>
+            seq_item_port.get(req);
+            <span style="color: #666666">-&gt;</span> begin_record;
+            drive_transfer(req);
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">protected</span> <span style="color: #008000; font-weight: bold">task</span> drive_transfer(packet_in tr);
+        vif.<span style="color: #880000">A</span> <span style="color: #666666">=</span> tr.<span style="color: #880000">A</span>;
+        vif.<span style="color: #880000">B</span> <span style="color: #666666">=</span> tr.<span style="color: #880000">B</span>;
+        vif.valid <span style="color: #666666">=</span> <span style="color: #666666">1</span>;
+
+        @(<span style="color: #008000; font-weight: bold">posedge</span> vif.clk)
+        
+        <span style="color: #008000; font-weight: bold">while</span>(<span style="color: #666666">!</span>vif.ready)
+            @(<span style="color: #008000; font-weight: bold">posedge</span> vif.clk);
+        
+        <span style="color: #666666">-&gt;</span> end_record;
+        @(<span style="color: #008000; font-weight: bold">posedge</span> vif.clk); <span style="color: #408080; font-style: italic">//hold time</span>
+        vif.valid <span style="color: #666666">=</span> <span style="color: #666666">0</span>;
+        @(<span style="color: #008000; font-weight: bold">posedge</span> vif.clk);
+    <span style="color: #008000; font-weight: bold">endtask</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> record_tr();
+        <span style="color: #008000; font-weight: bold">forever</span> <span style="color: #008000; font-weight: bold">begin</span>
+            @(begin_record);
+            begin_tr(req, <span style="color: #BA2121">&quot;driver&quot;</span>);
+            @(end_record);
+            end_tr(req);
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+<span style="color: #008000; font-weight: bold">endclass</span>
+</pre></div>
+<span class="caption text-muted">Driver that converts transactions into signals to feed the adder inputs (driver.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> monitor <span style="color: #008000; font-weight: bold">extends</span> uvm_monitor;
+    input_vif  vif;
+    <span style="color: #008000; font-weight: bold">event</span> begin_record, end_record;
+    packet_in tr;
+    uvm_analysis_port #(packet_in) item_collected_port;
+    <span style="color: #880000">`uvm_component_utils</span>(monitor)
+   
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name, uvm_component parent);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+        item_collected_port <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">new</span> (<span style="color: #BA2121">&quot;item_collected_port&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> build_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.build_phase(phase);
+        <span style="color: #008000; font-weight: bold">assert</span>(uvm_config_db#(input_vif)<span style="color: #666666">::</span>get(<span style="color: #008000; font-weight: bold">this</span>, <span style="color: #BA2121">&quot;&quot;</span>, <span style="color: #BA2121">&quot;vif&quot;</span>, vif));
+        tr <span style="color: #666666">=</span> packet_in<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;tr&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> run_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.run_phase(phase);
+        <span style="color: #008000; font-weight: bold">fork</span>
+            collect_transactions(phase);
+            record_tr();
+        <span style="color: #008000; font-weight: bold">join</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> collect_transactions(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">wait</span>(vif.rst <span style="color: #666666">===</span> <span style="color: #666666">1</span>);
+        @(<span style="color: #008000; font-weight: bold">negedge</span> vif.rst);
+        
+        <span style="color: #008000; font-weight: bold">forever</span> <span style="color: #008000; font-weight: bold">begin</span>
+            <span style="color: #008000; font-weight: bold">do</span> <span style="color: #008000; font-weight: bold">begin</span>
+                @(<span style="color: #008000; font-weight: bold">posedge</span> vif.clk);
+            <span style="color: #008000; font-weight: bold">end</span> <span style="color: #008000; font-weight: bold">while</span> (vif.valid <span style="color: #666666">===</span> <span style="color: #666666">0</span> <span style="color: #666666">||</span> vif.ready <span style="color: #666666">===</span> <span style="color: #666666">0</span>);
+            <span style="color: #666666">-&gt;</span> begin_record;
+            
+            tr.<span style="color: #880000">A</span> <span style="color: #666666">=</span> vif.<span style="color: #880000">A</span>;
+            tr.<span style="color: #880000">B</span> <span style="color: #666666">=</span> vif.<span style="color: #880000">B</span>;
+            item_collected_port.write(tr);
+
+            @(<span style="color: #008000; font-weight: bold">posedge</span> vif.clk);
+            <span style="color: #666666">-&gt;</span> end_record;
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> record_tr();
+        <span style="color: #008000; font-weight: bold">forever</span> <span style="color: #008000; font-weight: bold">begin</span>
+            @(begin_record);
+            begin_tr(tr, <span style="color: #BA2121">&quot;monitor&quot;</span>);
+            @(end_record);
+            end_tr(tr);
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+<span style="color: #008000; font-weight: bold">endclass</span>
+</pre></div>
+<span class="caption text-muted">Monitor that convets signals from the interface into transactions (monitor.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> agent <span style="color: #008000; font-weight: bold">extends</span> uvm_agent;
+    sequencer sqr;
+    driver    drv;
+    monitor   mon;
+
+    uvm_analysis_port #(packet_in) item_collected_port;
+
+    <span style="color: #880000">`uvm_component_utils</span>(agent)
+
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name <span style="color: #666666">=</span> <span style="color: #BA2121">&quot;agent&quot;</span>, uvm_component parent <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">null</span>);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+        item_collected_port <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #BA2121">&quot;item_collected_port&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> build_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.build_phase(phase);
+        mon <span style="color: #666666">=</span> monitor<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;mon&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+        sqr <span style="color: #666666">=</span> sequencer<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;sqr&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+        drv <span style="color: #666666">=</span> driver<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;drv&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> connect_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.connect_phase(phase);
+        mon.item_collected_port.connect(item_collected_port);
+        drv.seq_item_port.connect(sqr.seq_item_export);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+<span style="color: #008000; font-weight: bold">endclass</span><span style="color: #666666">:</span> agent
+</pre></div>
+<span class="caption text-muted">The agent (active agent) connects the sequencer to the driver (agent.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">typedef</span> <span style="color: #008000; font-weight: bold">virtual</span> output_if output_vif;
+
+<span style="color: #008000; font-weight: bold">class</span> driver_out <span style="color: #008000; font-weight: bold">extends</span> uvm_driver #(packet_out);
+    <span style="color: #880000">`uvm_component_utils</span>(driver_out)
+    output_vif vif;
+
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name <span style="color: #666666">=</span> <span style="color: #BA2121">&quot;driver_out&quot;</span>, uvm_component parent <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">null</span>);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> build_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.build_phase(phase);
+        <span style="color: #008000; font-weight: bold">assert</span>(uvm_config_db#(output_vif)<span style="color: #666666">::</span>get(<span style="color: #008000; font-weight: bold">this</span>, <span style="color: #BA2121">&quot;&quot;</span>, <span style="color: #BA2121">&quot;vif&quot;</span>, vif));
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> run_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.run_phase(phase);
+        <span style="color: #008000; font-weight: bold">fork</span>
+            reset_signals();
+            drive(phase);
+        <span style="color: #008000; font-weight: bold">join</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">protected</span> <span style="color: #008000; font-weight: bold">task</span> reset_signals();
+        <span style="color: #008000; font-weight: bold">wait</span> (vif.rst <span style="color: #666666">===</span> <span style="color: #666666">1</span>);
+        <span style="color: #008000; font-weight: bold">forever</span> <span style="color: #008000; font-weight: bold">begin</span>
+            vif.ready <span style="color: #666666">&lt;=</span> <span style="color: #666666">&#39;0</span>;
+            @(<span style="color: #008000; font-weight: bold">posedge</span> vif.rst);
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">protected</span> <span style="color: #008000; font-weight: bold">task</span> drive(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">wait</span>(vif.rst <span style="color: #666666">===</span> <span style="color: #666666">1</span>);
+        @(<span style="color: #008000; font-weight: bold">negedge</span> vif.rst);
+        @(<span style="color: #008000; font-weight: bold">posedge</span> vif.clk);
+        
+        vif.ready <span style="color: #666666">&lt;=</span> <span style="color: #666666">1</span>;
+    <span style="color: #008000; font-weight: bold">endtask</span>
+<span style="color: #008000; font-weight: bold">endclass</span>
+</pre></div>
+<span class="caption text-muted">The driver of the passive agent (driver_out.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> monitor_out <span style="color: #008000; font-weight: bold">extends</span> uvm_monitor;
+    <span style="color: #880000">`uvm_component_utils</span>(monitor_out)
+    output_vif  vif;
+    <span style="color: #008000; font-weight: bold">event</span> begin_record, end_record;
+    packet_out tr;
+    uvm_analysis_port #(packet_out) item_collected_port;
+   
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name, uvm_component parent);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+        item_collected_port <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">new</span> (<span style="color: #BA2121">&quot;item_collected_port&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> build_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.build_phase(phase);
+        <span style="color: #008000; font-weight: bold">assert</span>(uvm_config_db#(output_vif)<span style="color: #666666">::</span>get(<span style="color: #008000; font-weight: bold">this</span>, <span style="color: #BA2121">&quot;&quot;</span>, <span style="color: #BA2121">&quot;vif&quot;</span>, vif));
+        tr <span style="color: #666666">=</span> packet_out<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;tr&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> run_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.run_phase(phase);
+        <span style="color: #008000; font-weight: bold">fork</span>
+            collect_transactions(phase);
+            record_tr();
+        <span style="color: #008000; font-weight: bold">join</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> collect_transactions(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">wait</span>(vif.rst <span style="color: #666666">===</span> <span style="color: #666666">1</span>);
+        @(<span style="color: #008000; font-weight: bold">negedge</span> vif.rst);
+        
+        <span style="color: #008000; font-weight: bold">forever</span> <span style="color: #008000; font-weight: bold">begin</span>
+            <span style="color: #008000; font-weight: bold">do</span> <span style="color: #008000; font-weight: bold">begin</span>
+                @(<span style="color: #008000; font-weight: bold">posedge</span> vif.clk);
+            <span style="color: #008000; font-weight: bold">end</span> <span style="color: #008000; font-weight: bold">while</span> (vif.valid <span style="color: #666666">===</span> <span style="color: #666666">0</span> <span style="color: #666666">||</span> vif.ready <span style="color: #666666">===</span> <span style="color: #666666">0</span>);
+            <span style="color: #666666">-&gt;</span> begin_record;
+            
+            tr.data <span style="color: #666666">=</span> vif.data;
+            item_collected_port.write(tr);
+
+            @(<span style="color: #008000; font-weight: bold">posedge</span> vif.clk);
+            <span style="color: #666666">-&gt;</span> end_record;
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> record_tr();
+        <span style="color: #008000; font-weight: bold">forever</span> <span style="color: #008000; font-weight: bold">begin</span>
+            @(begin_record);
+            begin_tr(tr, <span style="color: #BA2121">&quot;monitor_out&quot;</span>);
+            @(end_record);
+            end_tr(tr);
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endtask</span>
+<span style="color: #008000; font-weight: bold">endclass</span>
+</pre></div>
+<span class="caption text-muted">The monitor of the passive agent (monitor_out.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> agent_out <span style="color: #008000; font-weight: bold">extends</span> uvm_agent;
+    driver_out    drv;
+    monitor_out   mon;
+
+    uvm_analysis_port #(packet_out) item_collected_port;
+
+    <span style="color: #880000">`uvm_component_utils</span>(agent_out)
+
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name <span style="color: #666666">=</span> <span style="color: #BA2121">&quot;agent_out&quot;</span>, uvm_component parent <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">null</span>);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+        item_collected_port <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #BA2121">&quot;item_collected_port&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> build_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.build_phase(phase);
+        mon <span style="color: #666666">=</span> monitor_out<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;mon_out&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+        drv <span style="color: #666666">=</span> driver_out<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;drv_out&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> connect_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.connect_phase(phase);
+        mon.item_collected_port.connect(item_collected_port);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+<span style="color: #008000; font-weight: bold">endclass</span><span style="color: #666666">:</span> agent_out
+</pre></div>
+<span class="caption text-muted">The passive agent (agent_out.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> comparator #(<span style="color: #008000; font-weight: bold">type</span> <span style="color: #880000">T</span> <span style="color: #666666">=</span> packet_out) <span style="color: #008000; font-weight: bold">extends</span> uvm_scoreboard;
+  <span style="color: #008000; font-weight: bold">typedef</span> comparator #(<span style="color: #880000">T</span>) this_type;
+  <span style="color: #880000">`uvm_component_param_utils</span>(this_type)
+
+  <span style="color: #008000; font-weight: bold">const</span> <span style="color: #008000; font-weight: bold">static</span> <span style="color: #008000; font-weight: bold">string</span> type_name <span style="color: #666666">=</span> <span style="color: #BA2121">&quot;comparator #(T)&quot;</span>;
+
+  uvm_put_imp #(<span style="color: #880000">T</span>, this_type) from_refmod;
+  uvm_analysis_imp #(<span style="color: #880000">T</span>, this_type) from_dut;
+
+  <span style="color: #008000; font-weight: bold">typedef</span> uvm_built_in_converter #( <span style="color: #880000">T</span> ) convert; 
+
+  <span style="color: #008000; font-weight: bold">int</span> m_matches, m_mismatches;
+  <span style="color: #880000">T</span> exp;
+  <span style="color: #008000; font-weight: bold">bit</span> free;
+  <span style="color: #008000; font-weight: bold">event</span> compared, end_of_simulation;
+
+  <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name, uvm_component parent);
+    <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+    from_refmod <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #BA2121">&quot;from_refmod&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    from_dut <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #BA2121">&quot;from_dut&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    m_matches <span style="color: #666666">=</span> <span style="color: #666666">0</span>;
+    m_mismatches <span style="color: #666666">=</span> <span style="color: #666666">0</span>;
+    exp <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #BA2121">&quot;exp&quot;</span>);
+    free <span style="color: #666666">=</span> <span style="color: #666666">1</span>;
+  <span style="color: #008000; font-weight: bold">endfunction</span>
+
+  <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">string</span> get_type_name();
+    <span style="color: #008000; font-weight: bold">return</span> type_name;
+  <span style="color: #008000; font-weight: bold">endfunction</span>
+
+  <span style="color: #008000; font-weight: bold">task</span> run_phase(uvm_phase phase);
+    phase.raise_objection(<span style="color: #008000; font-weight: bold">this</span>);
+    @(end_of_simulation);
+    phase.drop_objection(<span style="color: #008000; font-weight: bold">this</span>);
+  <span style="color: #008000; font-weight: bold">endtask</span>
+
+  <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> put(<span style="color: #880000">T</span> t);
+    <span style="color: #008000; font-weight: bold">if</span>(<span style="color: #666666">!</span>free) @compared;
+    exp.copy(t);
+    free <span style="color: #666666">=</span> <span style="color: #666666">0</span>;
+    
+    @compared;
+    free <span style="color: #666666">=</span> <span style="color: #666666">1</span>;
+  <span style="color: #008000; font-weight: bold">endtask</span>
+
+  <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">bit</span> try_put(<span style="color: #880000">T</span> t);
+    <span style="color: #008000; font-weight: bold">if</span>(free) <span style="color: #008000; font-weight: bold">begin</span>
+      exp.copy(t);
+      free <span style="color: #666666">=</span> <span style="color: #666666">0</span>;
+      <span style="color: #008000; font-weight: bold">return</span> <span style="color: #666666">1</span>;
+    <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">else</span> <span style="color: #008000; font-weight: bold">return</span> <span style="color: #666666">0</span>;
+  <span style="color: #008000; font-weight: bold">endfunction</span>
+
+  <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">bit</span> can_put();
+    <span style="color: #008000; font-weight: bold">return</span> free;
+  <span style="color: #008000; font-weight: bold">endfunction</span>
+
+  <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> write(<span style="color: #880000">T</span> rec);
+    <span style="color: #008000; font-weight: bold">if</span> (free)
+      uvm_report_fatal(<span style="color: #BA2121">&quot;No expect transaction to compare with&quot;</span>, <span style="color: #BA2121">&quot;&quot;</span>);
+    
+    <span style="color: #008000; font-weight: bold">if</span>(<span style="color: #666666">!</span>(exp.compare(rec))) <span style="color: #008000; font-weight: bold">begin</span>
+      uvm_report_warning(<span style="color: #BA2121">&quot;Comparator Mismatch&quot;</span>, <span style="color: #BA2121">&quot;&quot;</span>);
+      m_mismatches<span style="color: #666666">++</span>;
+    <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">else</span> <span style="color: #008000; font-weight: bold">begin</span>
+      uvm_report_info(<span style="color: #BA2121">&quot;Comparator Match&quot;</span>, <span style="color: #BA2121">&quot;&quot;</span>);
+      m_matches<span style="color: #666666">++</span>;
+    <span style="color: #008000; font-weight: bold">end</span>
+    
+    <span style="color: #008000; font-weight: bold">if</span>(m_matches<span style="color: #666666">+</span>m_mismatches <span style="color: #666666">&gt;</span> <span style="color: #666666">100</span>)
+      <span style="color: #666666">-&gt;</span> end_of_simulation;
+    
+    <span style="color: #666666">-&gt;</span> compared;
+  <span style="color: #008000; font-weight: bold">endfunction</span>
+<span style="color: #008000; font-weight: bold">endclass</span>
+</pre></div>
+<span class="caption text-muted">The comparator that is derived from the scoreboard class (comparator.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> env <span style="color: #008000; font-weight: bold">extends</span> uvm_env;
+    agent       mst;
+    refmod      rfm;
+    agent_out   slv;
+    comparator #(packet_out) comp;  
+    uvm_tlm_analysis_fifo #(packet_in) to_refmod;
+
+    <span style="color: #880000">`uvm_component_utils</span>(env)
+
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name, uvm_component parent <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">null</span>);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+        to_refmod <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #BA2121">&quot;to_refmod&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>); 
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> build_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.build_phase(phase);
+        mst <span style="color: #666666">=</span> agent<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;mst&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+        slv <span style="color: #666666">=</span> agent_out<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;slv&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+        rfm <span style="color: #666666">=</span> refmod<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;rfm&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+        comp <span style="color: #666666">=</span> comparator#(packet_out)<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;comp&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> connect_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.connect_phase(phase);
+        <span style="color: #408080; font-style: italic">// Connect MST to FIFO</span>
+        mst.item_collected_port.connect(to_refmod.analysis_export);
+        
+        <span style="color: #408080; font-style: italic">// Connect FIFO to REFMOD</span>
+        rfm.in.connect(to_refmod.get_export);
+        
+        <span style="color: #408080; font-style: italic">//Connect scoreboard</span>
+        rfm.out.connect(comp.from_refmod);
+        slv.item_collected_port.connect(comp.from_dut);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> end_of_elaboration_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.end_of_elaboration_phase(phase);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+  
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> report_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.report_phase(phase);
+        <span style="color: #880000">`uvm_info</span>(get_type_name(), <span style="color: #008000">$sformatf</span>(<span style="color: #BA2121">&quot;Reporting matched %0d&quot;</span>, comp.m_matches), <span style="color: #880000">UVM_NONE</span>)
+        <span style="color: #008000; font-weight: bold">if</span> (comp.m_mismatches) <span style="color: #008000; font-weight: bold">begin</span>
+            <span style="color: #880000">`uvm_error</span>(get_type_name(), <span style="color: #008000">$sformatf</span>(<span style="color: #BA2121">&quot;Saw %0d mismatched samples&quot;</span>, comp.m_mismatches))
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+<span style="color: #008000; font-weight: bold">endclass</span>
+</pre></div>
+<span class="caption text-muted">The UVM environment (env.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">class</span> simple_test <span style="color: #008000; font-weight: bold">extends</span> uvm_test;
+  env env_h;
+  sequence_in seq;
+
+  <span style="color: #880000">`uvm_component_utils</span>(simple_test)
+
+  <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name, uvm_component parent <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">null</span>);
+    <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+  <span style="color: #008000; font-weight: bold">endfunction</span>
+
+  <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> build_phase(uvm_phase phase);
+    <span style="color: #008000; font-weight: bold">super</span>.build_phase(phase);
+    env_h <span style="color: #666666">=</span> env<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;env_h&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    seq <span style="color: #666666">=</span> sequence_in<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;seq&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+  <span style="color: #008000; font-weight: bold">endfunction</span>
+ 
+  <span style="color: #008000; font-weight: bold">task</span> run_phase(uvm_phase phase);
+    seq.start(env_h.mst.sqr);
+  <span style="color: #008000; font-weight: bold">endtask</span><span style="color: #666666">:</span> run_phase
+
+<span style="color: #008000; font-weight: bold">endclass</span>
+</pre></div>
+<span class="caption text-muted">A simple test in UVM (simple_test.sv)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">import</span> <span style="color: #0000FF; font-weight: bold">uvm_pkg::*</span>;
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;uvm_macros.svh&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./input_if.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./output_if.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./adder.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./packet_in.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./packet_out.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./sequence_in.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./sequencer.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./driver.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./driver_out.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./monitor.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./monitor_out.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./agent.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./agent_out.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./refmod.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./comparator.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./env.sv&quot;</span>
+<span style="color: #880000">`include</span> <span style="color: #BA2121">&quot;./simple_test.sv&quot;</span>
+
+<span style="color: #408080; font-style: italic">//Top</span>
+<span style="color: #008000; font-weight: bold">module</span> top;
+  <span style="color: #008000; font-weight: bold">logic</span> clk;
+  <span style="color: #008000; font-weight: bold">logic</span> rst;
+  
+  <span style="color: #008000; font-weight: bold">initial</span> <span style="color: #008000; font-weight: bold">begin</span>
+    clk <span style="color: #666666">=</span> <span style="color: #666666">0</span>;
+    rst <span style="color: #666666">=</span> <span style="color: #666666">1</span>;
+    #<span style="color: #666666">22</span> rst <span style="color: #666666">=</span> <span style="color: #666666">0</span>;
+    
+  <span style="color: #008000; font-weight: bold">end</span>
+  
+  <span style="color: #008000; font-weight: bold">always</span> #<span style="color: #666666">5</span> clk <span style="color: #666666">=</span> <span style="color: #666666">!</span>clk;
+  
+  <span style="color: #008000; font-weight: bold">logic</span> [<span style="color: #666666">1:0</span>] state;
+  
+  input_if in(clk, rst);
+  output_if out(clk, rst);
+  
+  adder sum(in, out, state);
+
+  <span style="color: #008000; font-weight: bold">initial</span> <span style="color: #008000; font-weight: bold">begin</span>
+    <span style="color: #880000">`ifdef</span> <span style="color: #880000">INCA</span>
+       <span style="border: 1px solid #FF0000">$</span>recordvars();
+    <span style="color: #880000">`endif</span>
+    <span style="color: #880000">`ifdef</span> <span style="color: #880000">VCS</span>
+       <span style="border: 1px solid #FF0000">$</span>vcdpluson;
+    <span style="color: #880000">`endif</span>
+    <span style="color: #880000">`ifdef</span> <span style="color: #880000">QUESTA</span>
+       <span style="border: 1px solid #FF0000">$</span>wlfdumpvars();
+       set_config_int(<span style="color: #BA2121">&quot;*&quot;</span>, <span style="color: #BA2121">&quot;recording_detail&quot;</span>, <span style="color: #666666">1</span>);
+    <span style="color: #880000">`endif</span>
+    
+    uvm_config_db#(input_vif)<span style="color: #666666">::</span>set(uvm_root<span style="color: #666666">::</span>get(), <span style="color: #BA2121">&quot;*.env_h.mst.*&quot;</span>, <span style="color: #BA2121">&quot;vif&quot;</span>, in);
+    uvm_config_db#(output_vif)<span style="color: #666666">::</span>set(uvm_root<span style="color: #666666">::</span>get(), <span style="color: #BA2121">&quot;*.env_h.slv.*&quot;</span>,  <span style="color: #BA2121">&quot;vif&quot;</span>, out);
+    
+    run_test(<span style="color: #BA2121">&quot;simple_test&quot;</span>);
+  <span style="color: #008000; font-weight: bold">end</span>
+<span style="color: #008000; font-weight: bold">endmodule</span>
+</pre></div>
+
+<span class="caption text-muted">The top module (top.sv)</span>
+
+					<h2 class="section-heading">Direct Programming Interface (DPI)</h2>
+					<p>SystemVerilog Direct Programming Interface (DPI) is an interface in which SystemVerilog calls functions from foreign languages like C, C++, etc. The DPI consists of two layers: the SystemVerilog layer and the foreign language layer, that are isolated from each other. The code of the <i>refmod</i> is presented below in order to illustrate the usage of DPI. The function sum() is defined in the file external.cpp and once it will be called in the <i>refmod</i> the keyword "external C" should be added before the definition of the function sum().</p>
+                <!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #BC7A00">#include &lt;stdio.h&gt;</span>
+
+<span style="color: #008000; font-weight: bold">extern</span> <span style="color: #BA2121">&quot;C&quot;</span> <span style="color: #B00040">int</span> sum(<span style="color: #B00040">int</span> a, <span style="color: #B00040">int</span> b){
+  <span style="color: #008000; font-weight: bold">return</span> a<span style="color: #666666">+</span>b;
+}
+</pre></div>
+<span class="caption text-muted">Definition of the function sum for DPI import(external.cpp)</span>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #008000; font-weight: bold">import</span> <span style="border: 1px solid #FF0000">&quot;</span><span style="color: #0000FF; font-weight: bold">DPI</span><span style="color: #666666">-</span><span style="color: #880000">C</span><span style="color: #BA2121">&quot; context function int sum(int a, int b);</span>
+
+<span style="color: #008000; font-weight: bold">class</span> refmod <span style="color: #008000; font-weight: bold">extends</span> uvm_component;
+    <span style="color: #880000">`uvm_component_utils</span>(refmod)
+    
+    packet_in tr_in;
+    packet_out tr_out;
+    <span style="color: #008000; font-weight: bold">integer</span> a, b;
+    uvm_get_port #(packet_in) in;
+    uvm_put_port #(packet_out) out;
+    
+    <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #008000; font-weight: bold">string</span> name <span style="color: #666666">=</span> <span style="color: #BA2121">&quot;refmod&quot;</span>, uvm_component parent);
+        <span style="color: #008000; font-weight: bold">super</span>.<span style="color: #008000; font-weight: bold">new</span>(name, parent);
+        in <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #BA2121">&quot;in&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+        out <span style="color: #666666">=</span> <span style="color: #008000; font-weight: bold">new</span>(<span style="color: #BA2121">&quot;out&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span>
+    
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">function</span> <span style="color: #008000; font-weight: bold">void</span> build_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.build_phase(phase);
+        tr_out <span style="color: #666666">=</span> packet_out<span style="color: #666666">::</span>type_id<span style="color: #666666">::</span>create(<span style="color: #BA2121">&quot;tr_out&quot;</span>, <span style="color: #008000; font-weight: bold">this</span>);
+    <span style="color: #008000; font-weight: bold">endfunction</span><span style="color: #666666">:</span> build_phase
+    
+    <span style="color: #008000; font-weight: bold">virtual</span> <span style="color: #008000; font-weight: bold">task</span> run_phase(uvm_phase phase);
+        <span style="color: #008000; font-weight: bold">super</span>.run_phase(phase);
+        
+        <span style="color: #008000; font-weight: bold">forever</span> <span style="color: #008000; font-weight: bold">begin</span>
+            in.get(tr_in);
+            tr_out.data <span style="color: #666666">=</span> sum(tr_in.<span style="color: #880000">A</span>, tr_in.<span style="color: #880000">B</span>);
+            out.put(tr_out);
+        <span style="color: #008000; font-weight: bold">end</span>
+    <span style="color: #008000; font-weight: bold">endtask</span><span style="color: #666666">:</span> run_phase
+<span style="color: #008000; font-weight: bold">endclass</span><span style="color: #666666">:</span> refmod
+</pre></div>
+<span class="caption text-muted">refmod calling  DPI function (refmod.sv)</span>
+
+<p>A simple Makefile to run the UVM testbench of the adder module is with the VCS tool from Synopsys is shown below. To see transactions  and signals with the DVE just type <strong>make view_waves</strong> in the terminal. A screenshot of the DVE running the simulation can be seen in Figure (2).</p>
+
+<!-- HTML generated using hilite.me --><div style="background: #f8f8f8; overflow:auto;width:auto;border:solid gray;border-width:.1em .1em .1em .8em;padding:.2em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #0000FF">sim</span><span style="color: #666666">:</span> <span style="color: #666666">clean</span>
+	g++ -c external.cpp -o external.o
+	vcs -full64  -sverilog top.sv -dpi -ntb_opts uvm -debug_pp -timescale<span style="color: #666666">=</span>1ns/10ps  external.o
+	<span style="color: #19177C">$ </span>./simv +UVM_TR_RECORD +UVM_VERBOSITY<span style="color: #666666">=</span>HIGH +UVM_TESTNAME<span style="color: #666666">=</span>simple_test
+<span style="color: #0000FF">clean</span><span style="color: #666666">:</span>
+	rm -rf DVEfiles csrc simv simv.daidir ucli.key .vlogansetup.args .vlogansetup.env .vcs_lib_lock simv.vdb AN.DB vc_hdrs.h *.diag *.vpd *tar.gz external.o
+
+<span style="color: #0000FF">view_waves</span><span style="color: #666666">:</span>
+	dve &amp;
+</pre></div>
+<span class="caption text-muted">Makefile for the UVM testbench</span>
+
+<a href="img/dve_uvm.png">
+                        <img class="img-responsive center-block" src="img/dve_uvm.png" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (2): DVE running simulation</span>
+					
+					<p>References: <br>[1] Accellera. Universal  verification  methodology.  User's  Guide, 2011
+					<br> [2] <a href="http://lad.dsc.ufcg.edu.br/lad/pmwiki.php?n=Lad.BVM">LAD UVM Cl&aacute;ssico</a>
+                                        <br> [3] <a href="https://colorlesscube.com/uvm-guide-for-beginners/">UVM Guide for Beginners</a> 
+					<br> [4] <a href="https://www.edaplayground.com/s/example/546">Simple UVM Testbench - EDA Playground</a></p>
+                    <p>Also available in <a href="https://github.com/nelsoncsc/easyUVM">GitHub</a>. </p>
+				
+				</div>
+            </div>
+        </div>
+    </article>
+    
+	<hr>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson@sistenix.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://br.linkedin.com/in/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-circle fa-linkedin-color fa-stack-2x stacked-line-height"></i>
+                                    <i class="fa fa-linkedin fa-stack-1x fa-inverse stacked-line-height-2"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2016</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- jQuery -->
+    <script src="js/jquery.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+
+    <!-- Custom Theme JavaScript -->
+    <script src="js/clean-blog.min.js"></script>
+
+</body>
+
+</html>
+	

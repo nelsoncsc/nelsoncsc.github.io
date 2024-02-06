@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+ 
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+ 
+</script>
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - AMBA AXI Protocol">
+    <meta name="keywords" content="AMBA, AXI, Protocol, Valid, Ready, SystemVerilog, source, sink, Logarithm">
+    <meta name="author" content="Nelson Campos">
+	
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>AMBA AXI Protocol</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <!-- Custom Fonts -->
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="about.html">About</a>
+                    </li>
+                    <li>
+                        <a href="peasant.html">Peasant</a>
+                    </li>
+                </ul>
+            </div>
+            <!-- /.navbar-collapse -->
+        </div>
+        <!-- /.container -->
+    </nav>
+
+    <!-- Page Header -->
+    <!-- Set your background image for this header on the line below. -->
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>AMBA AXI Protocol</h1>
+                        <h2 class="subheading">A brief introduction to interconnect IP blocks</h2>
+                        <span class="meta">Posted by <a href="about.html">Nelson Campos</a> on August 04, 2016</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Post Content -->
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <p>The ARM Advanced Microcontroller Bus Architecture (<strong>AMBA</strong>) is an open-standard specification to interconnect functional blocks in system-on-chip (SoC) designs. </p>
+					<p>AMBA is widely used on a range of IP-Cores. In this protocol the communication between two blocks will occur when both handshake signals <strong>READY</strong> and <strong>VALID</strong> are both <strong>HIGH</strong> on the rising edge of the clock.</p>
+                    <p>The signal <strong>READY</strong> indicates when a block is ready to receive information from another block and the signal <strong>VALID</strong> indicates when a block is ready to send information to another block.</p>
+					<p>In Figure (1) can be seen the module source sending information  to a module sink. The source drives the <strong>VALID</strong> signal <strong>HIGH</strong>. The data or control information from source remains stable until the destination drives the <strong>READY</strong> signal <strong>HIGH</strong>, indicating that it accepts the data or control information. The arrow shows when the transfer occurs [1].</p>
+					
+					<a href="img/fig1.jpg">
+                        <img class="img-responsive center-block" src="img/fig1.jpg" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (1)</span>
+					
+					<p>In the Figure (2), the module sink drives <strong>READY</strong> <strong>HIGH</strong> before the data or control information is valid. This indicates that the destination can accept the data or control information in a single cycle as soon as it became valid. The arrow shows when the transfer occurs[1].</p>
+					<a href="img/fig2.jpg">
+                        <img class="img-responsive center-block" src="img/fig2.jpg" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (2)</span>
+					
+					<p>In Figure (3), both source and sink indicate in the same cycle that they can transfer the data or control information. In this case the transfer occurs right away. The arrow shows when the transfer occurs[1].</p>
+					<a href="img/fig3.jpg">
+                        <img class="img-responsive center-block" src="img/fig3.jpg" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (3)</span>
+					
+					<h2 class="section-heading">A Logarithm Algorithm with AMBA AXI</h2>
+					
+					<p>The communication bus of the <a href="logarithm.html">Logarithm</a> module is AMBA AXI. Figure (4) shows the communication of a module source that generates numbers to the LOG module and the module sink receives the logarithm of the numbers computed by the LOG.</p>
+					<a href="img/amba.png">
+                        <img class="img-responsive center-block" src="img/amba.png" alt="">
+                    </a>
+					<span class="caption text-muted">Figure (4)</span>
+					
+					<p>Table (1) gives a description of each signal of the LOG module. Note that the module has two signals for <strong>READY</strong> and two for <strong>VALID</strong>. The signals <strong>oReady</strong> and <strong>iValid</strong> control the LOG input bus and  the signals <strong>iReady</strong> and <strong>oValid</strong> control the LOG output bus.</p>
+					
+					<style type="text/css">
+.tg  {border-collapse:collapse;border-spacing:0;}
+.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;}
+.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;}
+.tg .tg-yw4l{vertical-align:top}
+</style>
+<table class="tg" align="center">
+  <tr>
+    <th class="tg-031e">signal name</th>
+    <th class="tg-031e">type</th>
+    <th class="tg-031e">description</th>
+  </tr>
+  <tr>
+    <td class="tg-031e">number</td>
+    <td class="tg-031e">input</td>
+    <td class="tg-031e">number generated by the source to stimulate the LOG</td>
+  </tr>
+  <tr>
+    <td class="tg-031e">oReady</td>
+    <td class="tg-031e">input</td>
+    <td class="tg-031e">handshake signal that indicates that the LOG is ready to receive the number</td>
+  </tr>
+  <tr>
+    <td class="tg-031e">iValid</td>
+    <td class="tg-031e">input</td>
+    <td class="tg-031e">handshake signal that indicates that the source is ready to send the number</td>
+  </tr>
+  <tr>
+    <td class="tg-031e">clock</td>
+    <td class="tg-031e">input</td>
+    <td class="tg-031e">clock signal</td>
+  </tr>
+  <tr>
+    <td class="tg-031e">reset</td>
+    <td class="tg-031e">input</td>
+    <td class="tg-031e">reset signal</td>
+  </tr>
+  <tr>
+    <td class="tg-031e">logNumber</td>
+    <td class="tg-031e">output</td>
+    <td class="tg-031e">logarithm of the number computed by the LOG</td>
+  </tr>
+  <tr>
+    <td class="tg-031e">iReady</td>
+    <td class="tg-031e">output</td>
+    <td class="tg-031e">handshake signal that indicates that the sink is ready to receive the logNumber</td>
+  </tr>
+  <tr>
+    <td class="tg-yw4l">oValid</td>
+    <td class="tg-yw4l">output</td>
+    <td class="tg-yw4l">handshake signal that indicates that the LOG is ready to send the logNumber</td>
+  </tr>
+</table>
+
+<span class="caption text-muted">Table (1)</span>
+
+		
+			
+                    <p>Reference: [1] AMBA AXI Protocol Specification</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelsoncscampos@gmail.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://br.linkedin.com/in/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-circle fa-linkedin-color fa-stack-2x stacked-line-height"></i>
+                                    <i class="fa fa-linkedin fa-stack-1x fa-inverse stacked-line-height-2"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2016</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- jQuery -->
+    <script src="js/jquery.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+
+    <!-- Custom Theme JavaScript -->
+    <script src="js/clean-blog.min.js"></script>
+
+</body>
+
+</html>
