@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - Verilator C++ and SystemVerilog testbench">
+    <meta name="keywords" content="hardware, Verilator, SystemVerilog, C++, testbench, simulation, waveform, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>Verilator C++ and SystemVerilog Testbench</title>
+
+    
+    <link rel="canonical" href="https://sistenix.com/verilator_tb.html">
+<link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>Verilator C++ and SystemVerilog Testbench</h1>
+                        <h2 class="subheading">How the simulation harness and the verification environment work together</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 21, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+<p>
+Verilator compiles synthesisable SystemVerilog into cycle-accurate C++ or SystemC. This is well known. What is less commonly explained is how a real project structures the boundary between the C++ simulation harness and a SystemVerilog testbench that contains drivers, monitors, and test logic. Most tutorials show one or the other. This post shows both layers together, using <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a> as a working example.
+</p>
+
+<h2 class="section-heading">The two-layer model</h2>
+
+<p>
+When Verilator elaborates a design it produces a C++ class — typically named <code>Vtop</code> — that represents the entire compiled hierarchy. The simulation loop, clock generation, and waveform dumping all live in a hand-written C++ file (<code>tb_cpp/sim_main.cpp</code>). The DUT RTL and the SystemVerilog testbench (drivers, interfaces, assertions, test logic) are compiled <em>inside</em> that same <code>Vtop</code> object. Neither layer runs independently: C++ owns time; SystemVerilog owns stimulus and checking.
+</p>
+
+<h2 class="section-heading">The C++ harness</h2>
+
+<p>
+The entry point is <code>sim_main.cpp</code>. Its responsibilities are narrow: create a <code>VerilatedContext</code>, instantiate <code>Vtop</code>, drive the clock, open an FST file for waveforms, and call <code>eval()</code> on every half-period until <code>$finish</code> is called from SystemVerilog.
+</p>
+
+<pre><code>#include "Vtop.h"
+#include "verilated.h"
+#include "verilated_fst_c.h"
+
+int main(int argc, char **argv) {
+    VerilatedContext* contextp = new VerilatedContext;
+    contextp->commandArgs(argc, argv);   // passes plusargs to SV
+
+    Vtop* top = new Vtop{contextp};
+
+    VerilatedFstC* tfp = new VerilatedFstC;
+    Verilated::traceEverOn(true);
+    top->trace(tfp, 99);
+    tfp->open("work/waves/sim.fst");
+
+    top->clk = 0;
+    top->rst_n = 0;
+
+    while (!contextp->gotFinish()) {
+        contextp->timeInc(1);
+        top->clk ^= 1;          // toggle clock every time unit
+        if (contextp->time() == 10)
+            top->rst_n = 1;     // release reset after 10 time units
+        top->eval();
+        tfp->dump(contextp->time());
+    }
+
+    tfp->close();
+    delete top;
+    delete contextp;
+    return 0;
+}
+</code></pre>
+<p>The C++ harness for verilaxi (<code>tb_cpp/sim_main.cpp</code>)</p>
+
+<p>
+<code>VerilatedContext</code> holds the global simulation state (time, finish flag, plusargs). Passing <code>argc</code> and <code>argv</code> into <code>commandArgs</code> is what makes plusargs such as <code>+TESTTYPE=1</code> and <code>+READY_PROB=70</code> available inside SystemVerilog via <code>$value$plusargs</code>. The FST dump is opened once and fed a timestamp on every <code>eval()</code> call.
+</p>
+
+<h2 class="section-heading">The SystemVerilog testbench</h2>
+
+<p>
+The top-level SV module (<code>tb/top/testbench.sv</code>) is the root of the compiled hierarchy. It instantiates the DUT, all virtual interfaces, the VIP classes, and the test. A compile-time <code>`define</code> selects which test module is included, keeping the file list clean.
+</p>
+
+<p>
+It helps to think of the project as two cooperating filesets. The <code>tb_cpp/</code> side is responsible for process-level concerns: starting the simulation, advancing timestamps, toggling clocks, applying top-level reset, and dumping waveforms. The <code>tb/top/testbench.sv</code> side is responsible for hardware-level concerns: wiring interfaces to the DUT, instantiating assertion modules and VIP, and running test logic. Verilator compiles both worlds into a single executable, but each side still has a very different job.
+</p>
+
+<pre><code>module testbench;
+    import axi_pkg::*;
+    import axi_dma_pkg::*;
+
+    logic clk;
+    logic rst_n;
+
+    // Interfaces
+    axil_if #(.ADDR_WIDTH(32), .DATA_WIDTH(32)) axil_if_u0 (.ACLK(clk), .ARESETn(rst_n));
+    axis_if #(.DATA_WIDTH(64))                  s_axis_u0  (.ACLK(clk), .ARESETn(rst_n));
+    axis_if #(.DATA_WIDTH(64))                  m_axis_u0  (.ACLK(clk), .ARESETn(rst_n));
+    axi_if  #(.ADDR_WIDTH(32), .DATA_WIDTH(64)) axi_wr_u0  (.ACLK(clk), .ARESETn(rst_n));
+    axi_if  #(.ADDR_WIDTH(32), .DATA_WIDTH(64)) axi_rd_u0  (.ACLK(clk), .ARESETn(rst_n));
+
+    // DUT
+    snix_axi_dma dut (
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .s_axil_*   (axil_if_u0.*),
+        .s_axis_*   (s_axis_u0.*),
+        .m_axis_*   (m_axis_u0.*),
+        .s2mm_*     (axi_wr_u0.*),
+        .mm2s_*     (axi_rd_u0.*)
+    );
+
+    // Test
+    `ifdef USE_DMA
+        test_dma u_test (clk, rst_n);
+    `endif
+
+endmodule
+</code></pre>
+<p>Simplified top-level testbench (<code>tb/top/testbench.sv</code>)</p>
+
+<p>
+The clock and reset signals are declared in <code>testbench</code> but <em>driven</em> by C++. Verilator connects the <code>top->clk</code> and <code>top->rst_n</code> members in <code>Vtop</code> directly to these nets. There is no <code>always #5 clk = ~clk</code> anywhere in the SV — the C++ harness is the only clock source.
+</p>
+
+<p>
+This split becomes especially useful once the testbench grows beyond a single clock. Modern Verilator timing support means the C++ harness can advance simulation timestamps while SystemVerilog code waits on real temporal events such as <code>@(posedge clk)</code>, <code>@(posedge wr_clk)</code>, or <code>#delay</code>. That is what makes practical CDC-oriented testbenches possible: asynchronous FIFO tests can model independent write and read clocks, and the SV side still sees correct event ordering because time is owned centrally by the C++ loop.
+</p>
+
+<h2 class="section-heading">Plusargs: passing parameters from the Makefile to SystemVerilog</h2>
+
+<p>
+Verilator forwards any <code>+key=value</code> argument on the command line to the simulated design. The Makefile passes parameters such as test scenario, backpressure probability, and FIFO mode directly into the SV testbench without recompilation.
+</p>
+
+<p>
+The flow is straightforward: the Makefile expands variables such as <code>TESTTYPE</code> and <code>READY_PROB</code> into simulator command-line arguments, <code>sim_main.cpp</code> forwards <code>argc</code> and <code>argv</code> into <code>contextp-&gt;commandArgs(...)</code>, and the SystemVerilog side picks them up with <code>$value$plusargs</code>. That keeps scenario selection outside the compiled testbench and makes large parameter sweeps cheap.
+</p>
+
+<pre><code>// In the Makefile
+make run TESTNAME=dma TESTTYPE=2 READY_PROB=70 SRC_BP=1
+</code></pre>
+
+<pre><code>// In the SystemVerilog test
+int testtype;
+int ready_prob;
+int src_bp;
+
+initial begin
+    if (!$value$plusargs("TESTTYPE=%d",   testtype))   testtype   = 0;
+    if (!$value$plusargs("READY_PROB=%d", ready_prob)) ready_prob = 100;
+    if (!$value$plusargs("SRC_BP=%d",     src_bp))     src_bp     = 0;
+end
+</code></pre>
+<p>Plusargs consumed in <code>test_dma.sv</code></p>
+
+<p>
+This pattern keeps test selection and stress parameters entirely outside the compiled binary. All test variants for a given <code>TESTNAME</code> share a single elaboration; only the plusargs change between runs. The parameter-aware waveform filenames (<code>dma_tt2_rp70.fst</code>) are constructed in the Makefile using the same variable names, so sweep runs never overwrite each other.
+</p>
+
+<h2 class="section-heading">The eval loop and time</h2>
+
+<p>
+Every call to <code>top->eval()</code> propagates combinational logic for the current time step. The clock is toggled once per time unit in the C++ loop, so a complete clock cycle requires two <code>eval()</code> calls: one for the rising edge and one for the falling edge. Verilator's <code>--timing</code> flag (used with coroutines in 5.x) allows SystemVerilog <code>@(posedge clk)</code> and <code>#delay</code> constructs inside tasks and classes to suspend and resume correctly across multiple <code>eval()</code> calls.
+</p>
+
+<pre><code>// Compile flags in config.mk
+VERILATOR_FLAGS += --timing
+VERILATOR_FLAGS += --assert
+VERILATOR_FLAGS += --trace-fst
+CFLAGS          += -fcoroutines   // required for --timing with GCC
+</code></pre>
+<p>Key Verilator flags from <code>mk/config.mk</code></p>
+
+<p>
+Without <code>--timing</code>, blocking tasks such as <code>axil_master::write()</code> — which waits for the handshake to complete over several clock cycles — would not suspend correctly. Coroutine support in C++20 (or the compiler's coroutine extension) is what makes multi-cycle SV tasks work inside a Verilator simulation.
+</p>
+
+<p>
+The same timing machinery is what lets the testbench represent timestamped behaviour faithfully. Waveform dumps receive monotonically increasing simulation time, delayed SV processes resume at the correct instant, and multi-clock or CDC scenarios no longer need to be approximated as single-cycle polling loops. In practice, that is the difference between a toy harness and one that can run DMA, AXI backpressure, and asynchronous FIFO tests with believable temporal behaviour.
+</p>
+
+<h2 class="section-heading">FST waveform dumping</h2>
+
+<p>
+FST (Fast Signal Trace) is preferred over VCD for large simulations because the file is compressed and written incrementally. <code>VerilatedFstC</code> is the Verilator-provided FST writer. The call to <code>top->trace(tfp, 99)</code> registers all signals up to 99 hierarchy levels deep. <code>tfp->dump(time)</code> writes a snapshot at every time step. The FST file can be opened in Surfer or GTKWave while the simulation is still running.
+</p>
+
+<p>Figure (2) shows an example FST waveform captured from a DMA simulation.</p>
+
+<a href="img/verilaxi/dma.png"><img src="img/verilaxi/dma.png" class="img-responsive center-block" alt="DMA simulation waveform in Surfer"></a>
+<p>Figure (2): DMA waveform opened in Surfer. The FST file is written by the C++ harness via <code>VerilatedFstC</code>.</p>
+
+<h2 class="section-heading">Why a lighter-weight environment?</h2>
+
+<p>
+UVM is a strong methodology and remains the right answer for many large verification programs. The reason verilaxi uses task-based drivers in plain SystemVerilog packages is not that UVM is inherently the wrong tool, but that a lighter-weight environment is faster to bring up when the immediate goal is to plumb interfaces, start running protocol traffic, and iterate quickly on the design and testbench together. The verilaxi VIP (AXI master, AXI-Lite master, AXI-Stream source and sink) is written in this style so useful tests can exist early, before a heavier verification stack is justified.
+</p>
+
+<h2 class="section-heading">Summary</h2>
+
+<p>
+The C++ harness and the SystemVerilog testbench are complementary layers. C++ owns the simulation loop, clock generation, reset sequencing, and FST dumping. SystemVerilog owns interface declarations, VIP classes, DUT instantiation, assertions, and test logic. Plusargs bridge the two layers at runtime without recompilation. The <code>--timing</code> flag and coroutine support are what allow multi-cycle SV tasks to work correctly inside the C++ eval loop.
+</p>
+
+<p>
+The full source for <code>sim_main.cpp</code>, the testbench top, and all VIP classes is available in the <a href="https://github.com/nelsoncsc/verilaxi">verilaxi repository</a>.
+</p>
+
+<p>
+Read next:<br>
+<a href="axi_vip.html">Building SystemVerilog AXI VIP for Fast Bring-Up</a> for the task-based drivers that live inside the SystemVerilog layer.<br>
+<a href="docker_ci.html">Reproducible RTL Simulation with Docker and GitHub Actions</a> for how the same testbench is run reproducibly in containers and CI.<br>
+<a href="fifo_cdc.html">Synchronous and Asynchronous FIFOs</a> for a design that benefits directly from Verilator timing support and realistic CDC simulation.<br>
+Implementation pointers in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>: <code>tb_cpp/sim_main.cpp</code>, <code>tb/top/testbench.sv</code>, and <code>mk/config.mk</code>.
+</p>
+
+                    <hr>
+
+                    <p>Also available in <a href="https://github.com/nelsoncsc/verilaxi">GitHub</a>.</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson@sistenix.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <scr

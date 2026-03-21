@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - Building lightweight SystemVerilog AXI VIP for fast testbench bring-up, with Verilator as a practical baseline flow.">
+    <meta name="keywords" content="hardware, AXI VIP, SystemVerilog, task-based verification, Verilator, AXI master, AXI slave, fast bring-up, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>Building SystemVerilog AXI VIP for Fast Bring-Up</title>
+
+    
+    <link rel="canonical" href="https://sistenix.com/axi_vip.html">
+<link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>Building SystemVerilog AXI VIP for Fast Bring-Up</h1>
+                        <h2 class="subheading">Task-based AXI4 drivers for fast testbench bring-up</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 21, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+<p>
+A previous post introduced the <a href="amba.html">AMBA AXI handshake</a> at a conceptual level. This post goes further: it shows how to build a practical AXI4 verification environment using task-based SystemVerilog drivers and simulate it with Verilator. All examples are taken from <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>, an open-source AXI verification library.
+</p>
+
+<h2 class="section-heading">Why a task-based environment?</h2>
+
+<p>
+UVM is excellent at what it is designed for: building large reusable verification environments with factory-driven composition, configuration databases, sequencers, scoreboards, and coverage infrastructure. That is the right long-term answer for many production verification projects.
+</p>
+
+<p>
+Verilaxi makes a different trade-off. The goal here is very fast testbench bring-up: get interfaces plumbed quickly, express protocol handshakes directly, and start running meaningful stress tests before a full UVM environment exists. Task-based drivers are a practical fit for that stage. They express the same handshake sequences — address phase, data phase, response phase — as plain SystemVerilog tasks inside classes, and they are straightforward to read, debug, and extend as the environment evolves.
+</p>
+
+<h2 class="section-heading">The AXI4 interface</h2>
+
+<p>
+An AXI4 interface in SystemVerilog groups all five channels (AW, W, B, AR, R) and their handshake signals into a single interface, parameterised by address width, data width, and ID width. All channels use the same VALID/READY handshake described in the <a href="amba.html">AMBA post</a>: a transfer occurs on the rising edge of the clock when both VALID and READY are high.
+</p>
+
+<pre><code>interface axi_if #(
+    parameter ADDR_WIDTH = 32,
+    parameter DATA_WIDTH = 64,
+    parameter ID_WIDTH   = 4
+)(
+    input logic ACLK,
+    input logic ARESETn
+);
+    // Write address channel
+    logic [ID_WIDTH-1:0]   awid;
+    logic [ADDR_WIDTH-1:0] awaddr;
+    logic [7:0]            awlen;
+    logic [2:0]            awsize;
+    logic [1:0]            awburst;
+    logic                  awvalid;
+    logic                  awready;
+
+    // Write data channel
+    logic [DATA_WIDTH-1:0]   wdata;
+    logic [DATA_WIDTH/8-1:0] wstrb;
+    logic                    wlast;
+    logic                    wvalid;
+    logic                    wready;
+
+    // Write response channel
+    logic [ID_WIDTH-1:0] bid;
+    logic [1:0]          bresp;
+    logic                bvalid;
+    logic                bready;
+
+    // Read address channel
+    logic [ID_WIDTH-1:0]   arid;
+    logic [ADDR_WIDTH-1:0] araddr;
+    logic [7:0]            arlen;
+    logic [2:0]            arsize;
+    logic [1:0]            arburst;
+    logic                  arvalid;
+    logic                  arready;
+
+    // Read data channel
+    logic [ID_WIDTH-1:0]   rid;
+    logic [DATA_WIDTH-1:0] rdata;
+    logic [1:0]            rresp;
+    logic                  rlast;
+    logic                  rvalid;
+    logic                  rready;
+
+    modport master (output awid, awaddr, awlen, awsize, awburst, awvalid,
+                           wdata, wstrb, wlast, wvalid, bready,
+                           arid, araddr, arlen, arsize, arburst, arvalid, rready,
+                    input  awready, wready, bid, bresp, bvalid,
+                           arready, rid, rdata, rresp, rlast, rvalid);
+
+    modport slave  (input  awid, awaddr, awlen, awsize, awburst, awvalid,
+                           wdata, wstrb, wlast, wvalid, bready,
+                           arid, araddr, arlen, arsize, arburst, arvalid, rready,
+                    output awready, wready, bid, bresp, bvalid,
+                           arready, rid, rdata, rresp, rlast, rvalid);
+endinterface
+</code></pre>
+<p>AXI4 interface definition (<code>tb/interfaces/axi_if.sv</code>)</p>
+
+<h2 class="section-heading">The AXI master driver</h2>
+
+<p>The <code>axi_master</code> class holds a virtual interface handle and provides tasks for write and read bursts. Each task drives the appropriate channels and waits for the handshake to complete before returning.</p>
+
+<pre><code>class axi_master #(
+    parameter ADDR_WIDTH = 32,
+    parameter DATA_WIDTH = 64,
+    parameter ID_WIDTH   = 4
+);
+    virtual axi_if #(ADDR_WIDTH, DATA_WIDTH, ID_WIDTH) vif;
+
+    function new(virtual axi_if #(ADDR_WIDTH, DATA_WIDTH, ID_WIDTH) vif);
+        this.vif = vif;
+    endfunction
+
+    // Single write burst: awlen+1 beats starting at addr
+    task write_burst(
+        input logic [ADDR_WIDTH-1:0]   addr,
+        input logic [7:0]              awlen,
+        input logic [2:0]              awsize,
+        input logic [DATA_WIDTH-1:0]   data[]
+    );
+        // AW channel
+        @(posedge vif.ACLK);
+        vif.awaddr  <= addr;
+        vif.awlen   <= awlen;
+        vif.awsize  <= awsize;
+        vif.awburst <= 2'b01;   // INCR
+        vif.awvalid <= 1;
+        @(posedge vif.ACLK iff vif.awready);
+        vif.awvalid <= 0;
+
+        // W channel
+        for (int i = 0; i <= awlen; i++) begin
+            vif.wdata  <= data[i];
+            vif.wstrb  <= '1;
+            vif.wlast  <= (i == awlen);
+            vif.wvalid <= 1;
+            @(posedge vif.ACLK iff vif.wready);
+        end
+        vif.wvalid <= 0;
+        vif.wlast  <= 0;
+
+        // B channel
+        vif.bready <= 1;
+        @(posedge vif.ACLK iff vif.bvalid);
+        vif.bready <= 0;
+    endtask
+
+    // Single read burst: arlen+1 beats starting at addr
+    task read_burst(
+        input  logic [ADDR_WIDTH-1:0] addr,
+        input  logic [7:0]            arlen,
+        input  logic [2:0]            arsize,
+        output logic [DATA_WIDTH-1:0] data[]
+    );
+        // AR channel
+        @(posedge vif.ACLK);
+        vif.araddr  <= addr;
+        vif.arlen   <= arlen;
+        vif.arsize  <= arsize;
+        vif.arburst <= 2'b01;
+        vif.arvalid <= 1;
+        @(posedge vif.ACLK iff vif.arready);
+        vif.arvalid <= 0;
+
+        // R channel
+        vif.rready <= 1;
+        for (int i = 0; i <= arlen; i++) begin
+            @(posedge vif.ACLK iff vif.rvalid);
+            data[i] = vif.rdata;
+        end
+        vif.rready <= 0;
+    endtask
+
+endclass
+</code></pre>
+<p>AXI4 master driver class (simplified from <code>tb/classes/axi/axi_master.sv</code>)</p>
+
+<h2 class="section-heading">Backpressure: the AXI slave model</h2>
+
+<p>
+A real memory controller does not always assert AWREADY, WREADY, or ARREADY immediately. The <code>axi_slave</code> VIP models this with a configurable <code>ready_prob</code> property: on each clock cycle, READY is asserted with probability <code>ready_prob</code> percent and withheld otherwise. This stresses the DUT FSMs under realistic memory-controller latency without changing any test logic.
+</p>
+
+<p>
+The important detail is that this is generated independently on a cycle-by-cycle basis, not from a fixed repeating stall pattern. In the VIP, the helper function below is called whenever the slave decides whether a READY signal should be asserted:
+</p>
+
+<pre><code>// Returns 1 with probability ready_prob%
+function automatic bit rand_ready();
+    if (ready_prob >= 100) return 1'b1;
+    if (ready_prob <= 0)   return 1'b0;
+    return ($urandom_range(99, 0) < ready_prob);
+endfunction
+</code></pre>
+<p>Random READY generation in <code>tb/classes/axi/axi_slave.sv</code></p>
+
+<p>
+If <code>ready_prob = 70</code>, then on each eligible clock edge the slave draws a fresh random integer between 0 and 99 and asserts READY only when the result is less than 70. That means READY is high on roughly 70% of cycles and low on roughly 30%, but the exact pattern changes from run to run. The resulting waveform looks much more like realistic backpressure from a memory subsystem than a deterministic every-third-cycle stall would.
+</p>
+
+<p>
+The AW, W, and AR channels are sampled separately, so each channel can stall independently. In particular, the write-data channel uses
+</p>
+
+<pre><code>// Assert WREADY when data is expected; randomly deassert when ready_prob < 100
+vif.wready <= (wr_beats_left &gt; 0) &amp;&amp; rand_ready();
+</code></pre>
+<p>W-channel backpressure generation in <code>axi_slave.sv</code></p>
+
+<p>
+That detail matters because it exercises exactly the corner cases we care about in a DMA or burst-capable master: address accepted but data stalled, data advancing unevenly across beats, and read commands that wait several cycles before the slave becomes ready. In other words, <code>ready_prob</code> is not just cosmetic randomness; it is a compact way to stress handshake robustness and state-machine correctness.
+</p>
+
+<pre><code>// 70% ready probability — slave stalls the master 30% of cycles
+axi_slave mem_slave;
+mem_slave = new(axi_if_u0.slave);
+mem_slave.ready_prob = 70;
+fork mem_slave.run(); join_none
+
+// Or via plusarg:
+make run TESTNAME=dma READY_PROB=70
+</code></pre>
+<p>Enabling AXI slave backpressure via the VIP property or a Makefile plusarg</p>
+
+<p>Figure (2) shows a DMA simulation waveform with <code>READY_PROB=80</code>. The gaps in AWREADY and WREADY are the slave withholding its ready signal.</p>
+
+<a href="img/verilaxi/dma.png"><img src="img/verilaxi/dma.png" class="img-responsive center-block" alt="DMA waveform with backpressure"></a>
+<p>Figure (2): DMA waveform with AXI slave backpressure (<code>READY_PROB=80</code>). The DUT S2MM engine stalls correctly while waiting for AWREADY and WREADY.</p>
+
+<h2 class="section-heading">Running a write and read burst</h2>
+
+<p>
+The following example drives a write burst followed by a read burst using the master driver directly. In practice, the high-level <code>axi_dma_driver</code> wraps these calls behind CSR configuration and stream tasks, but the underlying mechanism is the same.
+</p>
+
+<pre><code>module test_axi_rw (input logic clk, input logic rst_n);
+    import axi_pkg::*;
+
+    axi_if #(.ADDR_WIDTH(32), .DATA_WIDTH(64)) axi_if_u0 (.ACLK(clk), .ARESETn(rst_n));
+    axi_master #(32, 64) m;
+
+    logic [63:0] wr_data[] = new[4];
+    logic [63:0] rd_data[] = new[4];
+
+    initial begin
+        m = new(axi_if_u0.master);
+        @(posedge rst_n);
+
+        wr_data[0] = 64'h1111_0001_0000_0000;
+        wr_data[1] = 64'h2222_0002_0000_0000;
+        wr_data[2] = 64'h3333_0003_0000_0000;
+        wr_data[3] = 64'h4444_0004_0000_0000;
+
+        // 4-beat write burst at address 0x100, awsize=3 (8 bytes/beat)
+        m.write_burst(32'h100, 8'd3, 3'd3, wr_data);
+
+        // 4-beat read burst at address 0x100
+        m.read_burst(32'h100, 8'd3, 3'd3, rd_data);
+
+        foreach (rd_data[i])
+            assert (rd_data[i] === wr_data[i]) else $error("Mismatch at beat %0d", i);
+
+        $finish;
+    end
+endmodule
+</code></pre>
+<p>Write burst followed by read burst using the AXI master driver</p>
+
+<h2 class="section-heading">AXI-Lite and AXI-Stream</h2>
+
+<p>
+Verilaxi includes separate driver classes for AXI-Lite and AXI-Stream. <code>axil_master</code> provides <code>write(addr, data)</code> and <code>read(addr, data)</code> tasks for single-beat register accesses. <code>axis_source</code> and <code>axis_sink</code> drive and capture AXI-Stream packets respectively, with optional backpressure on TVALID and TREADY. These are described in detail in the posts on <a href="axi_csr.html">CSR design</a> and <a href="axi_dma.html">DMA engines</a>.
+</p>
+
+<h2 class="section-heading">Summary</h2>
+
+<p>
+Task-based AXI drivers in plain SystemVerilog are a practical and Verilator-compatible alternative to UVM agents. An interface groups all channel signals; a class holds the virtual interface and provides write and read burst tasks; a configurable slave model injects backpressure. The same pattern applies to AXI-Lite and AXI-Stream. The full VIP source is available in the <a href="https://github.com/nelsoncsc/verilaxi">verilaxi repository</a>.
+</p>
+
+<p>
+Read next:<br>
+<a href="axi_sva.html">Checking AXI Protocol with SystemVerilog Assertions</a> for the lightweight protocol checkers layered on top of the task-based environment.<br>
+<a href="verilator_tb.html">Building a Verilator Testbench for AXI Designs</a> for how the C++ harness and plusargs drive these classes at runtime.<br>
+<a href="axi_dma.html">AXI DMA — Moving Data Without the CPU</a> for a full design that uses the same VIP style.<br>
+Implementation pointers in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>: <code>tb/classes/axi/axi_master.sv</code>, <code>tb/classes/axi/axi_slave.sv</code>, and <code>tb/interfaces/axi_if.sv</code>.
+</p>
+
+<p>References:<br>
+[1] ARM. AMBA AXI and ACE Protocol Specification. 2011<br>
+[2] <a href="amba.html">AMBA AXI Protocol — sistenix.com</a>
+</p>
+
+                    <hr>
+
+                    <p>Also available in <a href="https://github.com/nelsoncsc/verilaxi">GitHub</a>.</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson@sistenix.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <scr

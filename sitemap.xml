@@ -7,23 +7,48 @@
 
 <url>
   <loc>https://sistenix.com/</loc>
-  <lastmod>2024-02-07T00:05:23+00:00</lastmod>
+  <lastmod>2026-03-21T16:23:12+00:00</lastmod>
   <priority>1.00</priority>
-</url>
-<url>
-  <loc>https://sistenix.com/index.html</loc>
-  <lastmod>2024-02-07T00:05:23+00:00</lastmod>
-  <priority>0.80</priority>
-</url>
-<url>
-  <loc>https://sistenix.com/blog.html</loc>
-  <lastmod>2024-02-07T00:05:23+00:00</lastmod>
-  <priority>0.80</priority>
 </url>
 <url>
   <loc>https://sistenix.com/peasant.html</loc>
   <lastmod>2024-02-07T00:05:23+00:00</lastmod>
   <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://sistenix.com/axi_dma.html</loc>
+  <lastmod>2026-03-21T16:23:12+00:00</lastmod>
+  <priority>0.90</priority>
+</url>
+<url>
+  <loc>https://sistenix.com/fifo_cdc.html</loc>
+  <lastmod>2026-03-21T16:23:12+00:00</lastmod>
+  <priority>0.90</priority>
+</url>
+<url>
+  <loc>https://sistenix.com/axi_csr.html</loc>
+  <lastmod>2026-03-21T16:23:12+00:00</lastmod>
+  <priority>0.88</priority>
+</url>
+<url>
+  <loc>https://sistenix.com/axi_sva.html</loc>
+  <lastmod>2026-03-21T16:23:12+00:00</lastmod>
+  <priority>0.88</priority>
+</url>
+<url>
+  <loc>https://sistenix.com/axi_vip.html</loc>
+  <lastmod>2026-03-21T16:23:12+00:00</lastmod>
+  <priority>0.88</priority>
+</url>
+<url>
+  <loc>https://sistenix.com/docker_ci.html</loc>
+  <lastmod>2026-03-21T16:23:12+00:00</lastmod>
+  <priority>0.86</priority>
+</url>
+<url>
+  <loc>https://sistenix.com/verilator_tb.html</loc>
+  <lastmod>2026-03-21T16:23:12+00:00</lastmod>
+  <priority>0.86</priority>
 </url>
 <url>
   <loc>https://sistenix.com/fft.html</loc>

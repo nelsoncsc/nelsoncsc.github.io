@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - Synchronous and asynchronous FIFOs in hardware">
+    <meta name="keywords" content="hardware, FIFO, asynchronous FIFO, synchronous FIFO, CDC, Gray code, AXI-Stream, SystemVerilog, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>Synchronous and Asynchronous FIFOs in Hardware</title>
+
+    
+    <link rel="canonical" href="https://sistenix.com/fifo_cdc.html">
+<link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <script type="text/javascript" async
+    src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML">
+    </script>
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>Synchronous and Asynchronous FIFOs in Hardware</h1>
+                        <h2 class="subheading">From RTL to CDC - building reliable data buffers</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 21, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+<p>
+A FIFO (First-In First-Out) buffer is one of the most common building blocks in digital hardware. It decouples a data producer from a data consumer, absorbs rate differences, and provides a clean backpressure boundary between subsystems. FIFOs show up everywhere: in image and video pipelines, in data-compression engines, in Ethernet and storage datapaths, and in clock-domain crossing paths where two parts of the design must exchange data safely despite running at different frequencies.
+</p>
+
+<p>
+In video systems, for example, FIFOs are often used to buffer raster streams so downstream blocks can process pixels a line or a frame segment at a time without stalling the source. In SoC fabrics they are equally important as elastic buffers between bus adapters, DMA engines, and peripherals. When the producer and consumer share the same clock, a synchronous FIFO is usually enough. When they operate on independent clocks, an asynchronous FIFO is required, and the design becomes much more subtle. This post explains both, using the implementations in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a> as concrete examples.
+</p>
+
+
+<h2 class="section-heading">The synchronous FIFO</h2>
+
+<p>A synchronous FIFO stores data in a RAM array and uses a write pointer and a read pointer to track the head and tail. This is the form most designers reach for when both ends of the path live in the same clock domain, for example in local buffering inside an image-processing stage, a decompression datapath, or a streaming bus adapter.</p>
+
+
+<p>
+The full and empty conditions are derived by comparing the pointers. A common implementation uses one extra bit in each pointer (making them <code>log2(DEPTH)+1</code> bits wide): the FIFO is empty when both pointers are identical, and full when they differ only in the MSB.
+</p>
+
+<pre><code>module snix_sync_fifo #(
+    parameter DATA_WIDTH = 32,
+    parameter FIFO_DEPTH = 16   // must be power of 2
+)(
+    input  logic                  clk,
+    input  logic                  rst_n,
+    input  logic                  wr_en,
+    input  logic [DATA_WIDTH-1:0] wr_data,
+    output logic                  full,
+    input  logic                  rd_en,
+    output logic [DATA_WIDTH-1:0] rd_data,
+    output logic                  empty
+);
+    localparam PTR_WIDTH = $clog2(FIFO_DEPTH) + 1;
+
+    logic [DATA_WIDTH-1:0] mem [0:FIFO_DEPTH-1];
+    logic [PTR_WIDTH-1:0]  wr_ptr, rd_ptr;
+
+    // Write port
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) wr_ptr <= '0;
+        else if (wr_en && !full) begin
+            mem[wr_ptr[PTR_WIDTH-2:0]] <= wr_data;
+            wr_ptr <= wr_ptr + 1;
+        end
+    end
+
+    // Read port
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) rd_ptr <= '0;
+        else if (rd_en && !empty)
+            rd_ptr <= rd_ptr + 1;
+    end
+
+    assign rd_data = mem[rd_ptr[PTR_WIDTH-2:0]];
+    assign empty   = (wr_ptr == rd_ptr);
+    assign full    = (wr_ptr[PTR_WIDTH-1] != rd_ptr[PTR_WIDTH-1]) &&
+                     (wr_ptr[PTR_WIDTH-2:0] == rd_ptr[PTR_WIDTH-2:0]);
+
+endmodule
+</code></pre>
+<p>Synchronous FIFO primitive (<code>rtl/common/snix_sync_fifo.sv</code>)</p>
+
+<h2 class="section-heading">Full and empty in real RTL</h2>
+
+<p>
+In the textbook version of a synchronous FIFO, the status logic looks trivial: <code>empty</code> is true when the write and read pointers are equal, and <code>full</code> is true when the pointers match in address bits but differ in the wrap bit. If the memory read is purely combinational, the data output can also be wired directly from the current read address, so the whole FIFO appears very simple.
+</p>
+
+<p>
+Real implementations get more interesting once the memory is expected to infer block RAM. FPGA BRAMs are most naturally inferred with synchronous read behaviour, which means the data output is registered and appears a cycle later. At that point, full and empty flags can no longer be treated as purely casual side calculations around the RAM array. The control logic must account for read latency, bypass conditions, and the exact cycle on which the FIFO transitions from empty to non-empty or from one item to zero items.
+</p>
+
+<p>
+That is why the verilaxi synchronous FIFO keeps explicit registered state such as <code>fill_cnt</code>, <code>fifo_empty</code>, and a first-word-fall-through bypass path. The bypass covers the case where a write arrives to an empty FIFO and software or downstream logic expects the first word to become visible immediately, even though the BRAM-style read path is registered. Without that extra logic, the FIFO would either add an unwanted bubble on the first read or fail to preserve the expected FWFT behaviour.
+</p>
+
+<p>
+One edge case is especially important: a read without a simultaneous write, that is <code>rd_en &amp;&amp; !wr_en</code>. In the verilaxi synchronous FIFO this is the <code>2'b01</code> case, where the design decrements <code>fill_cnt</code> and sets <code>fifo_empty &lt;= (fill_cnt &lt;= 1)</code>. The reason is subtle but important: if the FIFO currently holds exactly one word, then the read happening on this clock edge consumes the last valid item, so the FIFO must be marked empty for the <em>next</em> cycle. Testing <code>fill_cnt == 0</code> would be too late, because by the time the counter has visibly become zero the control has already missed the transition point.
+</p>
+
+<p>
+The same logic explains why the condition is <code>&lt;= 1</code> rather than exactly <code>== 1</code>. It protects the boundary cleanly and keeps the registered empty flag aligned with the post-read occupancy. In other words, the empty flag is not answering "was the FIFO empty before this edge?" but rather "will the FIFO be empty after this accepted read completes?" That is the right question when the data path is registered.
+</p>
+
+<p>
+There is a related edge on the full side as well. Because the synchronous FIFO tracks occupancy explicitly with <code>fill_cnt</code>, the full condition is taken from the MSB of that counter rather than from a fresh combinational pointer comparison. A write with no matching read increments the count; once the counter reaches the configured capacity, the MSB asserts and the next write is blocked. Again, the key point is that registered status follows the state <em>after</em> the accepted transfer, not just the state visible before it.
+</p>
+
+<p>
+The same caution applies to asynchronous FIFOs. In theory, one can describe full and empty entirely as pointer comparisons. In practice, once the design uses Gray-coded pointers, synchroniser stages, and BRAM-friendly registered reads, the full and empty decisions become intentionally conservative. The write side sees a delayed version of the read pointer, the read side sees a delayed version of the write pointer, and the data output is often registered. That delay is exactly why the extra CDC headroom discussed above is not optional hand-waving but part of making the implementation robust.
+</p>
+
+<p>
+The asynchronous FIFO handles the same problem differently because there is no single trustworthy local fill counter shared by both domains. Instead, the read side computes emptiness from the synchronised write pointer: in verilaxi the local condition is <code>lcl_rd_empty = (rd_wgray == rgray)</code>, and the registered output <code>rempty</code> is updated only when the read-side control advances. Likewise, the write side computes <code>wfull</code> from the synchronised read pointer with the usual Gray-code wrap-bit test. So the sync FIFO says "after this local read, the count will be zero," whereas the async FIFO says "based on the latest safely synchronised remote pointer, no unread words remain." Both are solving the same boundary problem, but one uses local occupancy state and the other uses delayed cross-domain pointer knowledge.
+</p>
+
+<p>
+So there is a real trade-off here. Combinational-read FIFOs are easy to describe and easy to reason about in a whiteboard derivation. Registered-read FIFOs need more status and bypass logic, but that complexity is what allows the design to map cleanly onto BRAM and scale to realistic buffer sizes. That is the path taken in the verilaxi sync and async FIFOs: more careful control logic in exchange for better hardware inference and more realistic implementation behaviour.
+</p>
+
+<h2 class="section-heading">The clock domain crossing problem</h2>
+
+<p>
+When the write and read sides operate on independent clocks — for example, a 300 MHz write clock and a 200 MHz read clock — the pointer comparison used in the synchronous FIFO breaks down. A binary pointer updated in the write clock domain contains multiple bits that change simultaneously. If the read clock samples this pointer at an inopportune moment, it may see a partially updated value (a glitch), which causes an incorrect full or empty decision. This is a clock domain crossing (CDC) hazard.
+</p>
+
+<h2 class="section-heading">Sizing the FIFO depth</h2>
+
+<p>
+Choosing the FIFO depth is not just a matter of picking a convenient power of two. In practice the depth must absorb the worst-case difference between how fast data arrives and how fast it can be removed, plus a small amount of extra headroom due to CDC synchronisation latency and pessimistic full and empty flag generation.
+</p>
+
+<p>
+A useful first-order sizing rule is
+</p>
+
+$$
+D_{\text{fifo}} \ge \left\lceil \Delta R \cdot T_{\text{stall}} \right\rceil + H_{\text{cdc}}
+$$
+
+<p>
+where \(\Delta R = \max(0, R_{\text{wr}} - R_{\text{rd}})\) is the worst-case excess write rate over the read rate during a burst or stall window, \(T_{\text{stall}}\) is the maximum time the reader can be unable to drain the FIFO, and \(H_{\text{cdc}}\) is a safety margin that covers synchroniser delay, pointer visibility lag across the clock domains, and any conservative full/empty flag behaviour.
+</p>
+
+<p>
+Putting numbers on this helps. Suppose the write side runs at \(300\,\text{MHz}\) and can push one word per cycle, while the read side runs at \(200\,\text{MHz}\) and also removes one word per cycle. The excess arrival rate is then
+</p>
+
+$$
+\Delta R = 300 \times 10^6 - 200 \times 10^6 = 100 \times 10^6 \text{ words/s}
+$$
+
+<p>
+If the read side can be stalled for \(80\,\text{ns}\), then the write side can accumulate about
+</p>
+
+$$
+\Delta R \cdot T_{\text{stall}} = 100 \times 10^6 \cdot 80 \times 10^{-9} = 8
+$$
+
+<p>
+extra words during that window. Adding, say, \(H_{\text{cdc}} = 3\) words of CDC margin gives a practical minimum of \(11\) words, so the implementation would usually round up to a power of two such as 16.
+</p>
+
+<p>
+As another example, if the write clock is \(148.5\,\text{MHz}\) and the read clock is \(100\,\text{MHz}\), the ratio is \(1.485{:}1\). The net accumulation rate is \(48.5\,\text{Mwords/s}\). Over a \(200\,\text{ns}\) burst of downstream stall, the FIFO must absorb about
+</p>
+
+$$
+48.5 \times 10^6 \cdot 200 \times 10^{-9} = 9.7
+$$
+
+<p>
+words, which means at least 10 storage locations before CDC margin. With a headroom of 2 to 4 words, a depth of 16 is again a sensible engineering choice.
+</p>
+
+<p>
+In a purely asynchronous FIFO, the CDC headroom matters because the write side does not see the read pointer instantaneously, and the read side does not see the write pointer instantaneously either. A common practical rule is to reserve at least two or three words of headroom beyond the analytically required storage. That margin keeps the design away from the exact full/empty boundary where synchroniser delay is most painful.
+</p>
+
+<p>
+For raster video, the same idea appears in a more application-specific way. If a downstream block consumes one whole video line in bursts, the FIFO often needs to hold approximately one line of pixels plus CDC headroom:
+</p>
+
+$$
+D_{\text{video}} \ge N_{\text{line}} + H_{\text{cdc}}
+$$
+
+<p>
+and multi-line image filters may need two or more full-line buffers depending on the stencil. The exact number depends on the algorithm, but the principle is the same: start from the dataflow requirement, then add explicit CDC margin rather than assuming the theoretical minimum is enough.
+</p>
+
+<h2 class="section-heading">Gray code encoding</h2>
+
+<p>
+The classic solution is to encode the pointer in Gray code before crossing the clock domain. A Gray code counter changes only one bit per increment, which means the receiving clock domain either sees the old value or the new value — never a glitch. Figure (3) shows the Gray code for a 3-bit counter.
+</p>
+
+<pre><code>// Binary to Gray code conversion
+function automatic [PTR_WIDTH-1:0] bin2gray(input [PTR_WIDTH-1:0] bin);
+    return bin ^ (bin >> 1);
+endfunction
+
+// Gray code to binary conversion (for local use only — never cross gray back to binary)
+function automatic [PTR_WIDTH-1:0] gray2bin(input [PTR_WIDTH-1:0] gray);
+    logic [PTR_WIDTH-1:0] bin;
+    bin[PTR_WIDTH-1] = gray[PTR_WIDTH-1];
+    for (int i = PTR_WIDTH-2; i >= 0; i--)
+        bin[i] = bin[i+1] ^ gray[i];
+    return bin;
+endfunction
+</code></pre>
+<p>Binary-to-Gray and Gray-to-binary conversion functions</p>
+
+<h2 class="section-heading">The asynchronous FIFO</h2>
+
+<p>
+The asynchronous FIFO (<code>snix_async_fifo</code>) uses separate write and read clocks. The write pointer is maintained in binary in the write clock domain, converted to Gray code, and synchronised into the read clock domain through a two-stage flip-flop synchroniser. The read pointer undergoes the same treatment in the opposite direction. Full and empty flags are then computed using the Gray-coded pointers.
+</p>
+
+<pre><code>module snix_async_fifo #(
+    parameter DATA_WIDTH = 32,
+    parameter FIFO_DEPTH = 16
+)(
+    input  logic                  wr_clk,
+    input  logic                  wr_rst_n,
+    input  logic                  wr_en,
+    input  logic [DATA_WIDTH-1:0] wr_data,
+    output logic                  wr_full,
+
+    input  logic                  rd_clk,
+    input  logic                  rd_rst_n,
+    input  logic                  rd_en,
+    output logic [DATA_WIDTH-1:0] rd_data,
+    output logic                  rd_empty
+);
+    localparam PTR_WIDTH = $clog2(FIFO_DEPTH) + 1;
+
+    // Dual-port RAM
+    logic [DATA_WIDTH-1:0] mem [0:FIFO_DEPTH-1];
+
+    // Write-domain pointers (binary and Gray)
+    logic [PTR_WIDTH-1:0] wr_ptr_bin, wr_ptr_gray;
+    logic [PTR_WIDTH-1:0] rd_ptr_gray_sync1, rd_ptr_gray_sync2;  // read ptr synced to wr_clk
+
+    // Read-domain pointers (binary and Gray)
+    logic [PTR_WIDTH-1:0] rd_ptr_bin, rd_ptr_gray;
+    logic [PTR_WIDTH-1:0] wr_ptr_gray_sync1, wr_ptr_gray_sync2;  // write ptr synced to rd_clk
+
+    // Write side
+    always_ff @(posedge wr_clk or negedge wr_rst_n) begin
+        if (!wr_rst_n) wr_ptr_bin <= '0;
+        else if (wr_en && !wr_full)
+            wr_ptr_bin <= wr_ptr_bin + 1;
+    end
+    assign wr_ptr_gray = wr_ptr_bin ^ (wr_ptr_bin >> 1);
+
+    always_ff @(posedge wr_clk or negedge wr_rst_n) begin
+        if (!wr_rst_n) begin
+            rd_ptr_gray_sync1 <= '0;
+            rd_ptr_gray_sync2 <= '0;
+        end else begin
+            rd_ptr_gray_sync1 <= rd_ptr_gray;
+            rd_ptr_gray_sync2 <= rd_ptr_gray_sync1;
+        end
+    end
+
+    // Full: write pointer has lapped the read pointer
+    assign wr_full = (wr_ptr_gray[PTR_WIDTH-1]   != rd_ptr_gray_sync2[PTR_WIDTH-1])   &&
+                     (wr_ptr_gray[PTR_WIDTH-2]   != rd_ptr_gray_sync2[PTR_WIDTH-2])   &&
+                     (wr_ptr_gray[PTR_WIDTH-3:0] == rd_ptr_gray_sync2[PTR_WIDTH-3:0]);
+
+    // Write to memory
+    always_ff @(posedge wr_clk)
+        if (wr_en && !wr_full)
+            mem[wr_ptr_bin[PTR_WIDTH-2:0]] <= wr_data;
+
+    // Read side
+    always_ff @(posedge rd_clk or negedge rd_rst_n) begin
+        if (!rd_rst_n) rd_ptr_bin <= '0;
+        else if (rd_en && !rd_empty)
+            rd_ptr_bin <= rd_ptr_bin + 1;
+    end
+    assign rd_ptr_gray = rd_ptr_bin ^ (rd_ptr_bin >> 1);
+
+    always_ff @(posedge rd_clk or negedge rd_rst_n) begin
+        if (!rd_rst_n) begin
+            wr_ptr_gray_sync1 <= '0;
+            wr_ptr_gray_sync2 <= '0;
+        end else begin
+            wr_ptr_gray_sync1 <= wr_ptr_gray;
+            wr_ptr_gray_sync2 <= wr_ptr_gray_sync1;
+        end
+    end
+
+    assign rd_empty = (rd_ptr_gray == wr_ptr_gray_sync2);
+    assign rd_data  = mem[rd_ptr_bin[PTR_WIDTH-2:0]];
+
+endmodule
+</code></pre>
+<p>Asynchronous FIFO with Gray-coded pointer synchronisation (<code>rtl/common/snix_async_fifo.sv</code>)</p>
+
+<h2 class="section-heading">The AXI-Stream async FIFO and frame mode</h2>
+
+<p>
+<code>snix_axis_afifo</code> wraps <code>snix_async_fifo</code> with an AXI-Stream interface and adds a frame-aware mode (<code>FRAME_FIFO</code>). In streaming mode (<code>FRAME_FIFO=0</code>), the output side begins draining as soon as data is available. In frame mode (<code>FRAME_FIFO=1</code>), the read side waits until a complete packet (a beat with TLAST asserted) has been written before asserting TVALID. This ensures frames are emitted atomically — the consumer never sees a partial frame.
+</p>
+
+<p>
+Frame completion is a one-cycle event in the write clock domain. Crossing it to the read domain without missing it requires a toggle synchroniser: a flip-flop in the write domain toggles on every TLAST beat; a two-stage synchroniser in the read domain captures the toggle. The read logic detects a change in the synchronised toggle and releases the read side.
+</p>
+
+<a href="img/verilaxi/cdc_fifo.svg"><img src="img/verilaxi/cdc_fifo.svg" class="img-responsive center-block" alt="Asynchronous FIFO CDC structure"></a>
+<p>Figure (4): AXI-Stream asynchronous FIFO structure across write and read clock domains. The Gray-coded pointer exchange is part of the implementation even though it is not drawn explicitly in this simplified block diagram.</p>
+
+<a href="img/verilaxi/axis_fifo.png"><img src="img/verilaxi/axis_fifo.png" class="img-responsive center-block" alt="AXI-Stream async FIFO waveform"></a>
+<p>Figure (5): AXI-Stream async FIFO in frame mode. The output side waits until TLAST has been written before beginning to drain. Waveform captured from verilaxi.</p>
+
+<h2 class="section-heading">Running the simulation</h2>
+
+<pre><code># Streaming mode, source and sink backpressure
+make run TESTNAME=axis_afifo FRAME_FIFO=0 TESTTYPE=1 SRC_BP=1 SINK_BP=1
+
+# Frame store-and-forward mode
+make run TESTNAME=axis_afifo FRAME_FIFO=1 TESTTYPE=1 SRC_BP=1 SINK_BP=1
+</code></pre>
+<p>Running the async FIFO simulation with verilaxi</p>
+
+<h2 class="section-heading">Summary</h2>
+
+<p>
+A synchronous FIFO uses matching write and read pointers with an extra MSB to distinguish full from empty, making it a compact and efficient solution for same-clock buffering. An asynchronous FIFO solves the CDC problem by encoding pointers in Gray code before synchronising them across clock domains with a two-stage flip-flop chain. Frame mode adds a toggle synchroniser so complete packets are released atomically rather than leaking out beat by beat.
+</p>
+
+<p>
+That combination of simple elasticity, safe clock crossing, and stream-aware buffering is why FIFOs appear in so many systems: video-line buffers, image-processing pipelines, compression datapaths, DMA front ends, and general SoC interconnect glue logic. The full implementation of <code>snix_sync_fifo</code>, <code>snix_async_fifo</code>, and <code>snix_axis_afifo</code> is available in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>.
+</p>
+
+<p>
+Read next:<br>
+<a href="axi_dma.html">AXI DMA — Moving Data Without the CPU</a> for a system-level example of FIFOs in streaming datapaths.<br>
+<a href="verilator_tb.html">Building a Verilator Testbench for AXI Designs</a> for how the async FIFO and CDC tests are run.<br>
+Implementation pointers in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>: <code>rtl/common/snix_sync_fifo.sv</code>, <code>rtl/common/snix_async_fifo.sv</code>, and <code>rtl/axis/snix_axis_afifo.sv</code>.
+</p>
+
+
+<p>References:<br>
+[1] Clifford E. Cummings. Simulation and Synthesis Techniques for Asynchronous FIFO Design. SNUG San Jose, 2002.<br>
+[2] Dan Gisselquist. Cross clock asynchronous FIFO in Verilog. ZipCPU, 2018.<br>
+[3] 01signal. Timing constraints for FPGA FIFOs and why improved timing matters.<br>
+[4] ARM. AMBA AXI4-Stream Protocol Specification. 2010.
+</p>
+
+                    <hr>
+
+                    <p>Also available in <a href="https://github.com/nelsoncsc/verilaxi">GitHub</a>.</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson@sistenix.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <scr

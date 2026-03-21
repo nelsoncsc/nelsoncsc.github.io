@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - Reproducible RTL simulation with Docker and GitHub Actions">
+    <meta name="keywords" content="hardware, Verilator, Docker, GitHub Actions, CI, RTL simulation, Yosys, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>Reproducible RTL Simulation with Docker and GitHub Actions</title>
+
+    
+    <link rel="canonical" href="https://sistenix.com/docker_ci.html">
+<link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>Reproducible RTL Simulation with Docker and GitHub Actions</h1>
+                        <h2 class="subheading">No more "works on my machine"</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 21, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+<p>
+Hardware engineers are often behind software engineers on continuous integration practices. A simulator version mismatch between a contributor's laptop and a colleague's workstation can cause a simulation to fail, pass incorrectly, or produce different waveforms with no obvious explanation. <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a> uses Docker and GitHub Actions to eliminate this problem: anyone who clones the repository and runs <code>make</code> inside the container gets identical results, on any operating system, every time.
+</p>
+
+<h2 class="section-heading">The problem: tool version sensitivity</h2>
+
+<p>
+Verilaxi is validated against Verilator 5.046 specifically. Older 5.x releases packaged by Linux distributions may fail to parse parts of the testbench or silently miscompile coroutine-dependent tasks. There is no warning — the simulation either crashes or produces wrong results. Without a pinned environment, every new contributor or CI runner is a potential source of noise.
+</p>
+
+<p>
+The same applies to Yosys for synthesis. Version differences in the synthesis tool can produce different resource counts or fail on specific constructs, making it impossible to compare synthesis results across machines.
+</p>
+
+<h2 class="section-heading">The Dockerfile</h2>
+
+<p>
+The Dockerfile builds a minimal Ubuntu-based image with Verilator 5.046 and Yosys compiled from source, plus the C++17 toolchain and make. Pinning to a specific commit or release tag in the Dockerfile is what guarantees reproducibility.
+</p>
+
+<pre><code>FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    build-essential git autoconf flex bison \
+    libfl-dev libfl2 zlib1g-dev help2man \
+    python3 cmake ccache numactl perl \
+    tcl-dev libreadline-dev libffi-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verilator 5.046 from source
+RUN git clone https://github.com/verilator/verilator.git /verilator && \
+    cd /verilator && git checkout v5.046 && \
+    autoconf && ./configure && make -j$(nproc) && make install
+
+# Yosys from source
+RUN git clone https://github.com/YosysHQ/yosys.git /yosys && \
+    cd /yosys && make -j$(nproc) && make install
+
+WORKDIR /workspace
+</code></pre>
+<p>Simplified Dockerfile for verilaxi</p>
+
+<p>
+The image is built once. After that, every simulation and synthesis run uses the same binary. No README section saying "install Verilator 5.046 manually" is needed.
+</p>
+
+<h2 class="section-heading">Running simulations in the container</h2>
+
+<p>
+The repository is volume-mounted into the container at runtime. This means the source files, Makefile, and output directories are all on the host filesystem — no copying in or out is needed, and the results (logs, FST waveforms) appear directly in the working directory.
+</p>
+
+<p>
+Each part of the command has a specific purpose. <code>docker build -t verilaxi .</code> creates a reusable image named <code>verilaxi</code>. In the run commands, <code>--rm</code> deletes the container after the command finishes, <code>-it</code> makes the shell interactive, <code>-v "$PWD":/workspace</code> mounts the current repository into the container, and <code>-w /workspace</code> makes that mounted directory the working directory before running <code>make</code>. The final tokens are just the command executed inside the container.
+</p>
+
+<pre><code># Build the image (once)
+docker build -t verilaxi .
+
+# Run a simulation
+docker run --rm -it -v "$PWD":/workspace -w /workspace verilaxi \
+    make run TESTNAME=dma TESTTYPE=3 READY_PROB=80
+
+# Run synthesis
+docker run --rm -it -v "$PWD":/workspace -w /workspace verilaxi \
+    make synth SYNTH_NAME=axis_afifo SYNTH_TARGET=artix7
+
+# Check tool versions
+docker run --rm -it -v "$PWD":/workspace -w /workspace verilaxi \
+    bash -lc "verilator --version && yosys -V"
+</code></pre>
+<p>Running simulations and synthesis inside the verilaxi container</p>
+
+<p>
+The <code>--rm</code> flag removes the container after the run. The <code>-v "$PWD":/workspace</code> flag mounts the current directory. On macOS and WSL2, a Linux-specific <code>OBJ_DIR</code> avoids trying to execute host-compiled binaries inside the container.
+</p>
+
+<p>
+So a command such as <code>docker run --rm -it -v "$PWD":/workspace -w /workspace verilaxi make run TESTNAME=dma TESTTYPE=3 READY_PROB=80</code> literally means: start a temporary container from the <code>verilaxi</code> image, mount this checkout into it, enter that directory, and run the normal project Makefile with the chosen test parameters.
+</p>
+
+<pre><code># macOS or WSL2: use a separate obj_dir for the Linux container build
+docker run --rm -it -v "$PWD":/workspace -w /workspace verilaxi \
+    make run OBJ_DIR=work/obj_dir_linux TESTNAME=axis_afifo \
+    FRAME_FIFO=1 TESTTYPE=1 SRC_BP=1 SINK_BP=1
+</code></pre>
+<p>Cross-platform: separate OBJ_DIR prevents host and container build artefacts from colliding</p>
+
+<h2 class="section-heading">The sweep script</h2>
+
+<p>
+<code>scripts/sweep.sh</code> is a convenience regression runner that exercises the full simulation and synthesis matrices in a single command. It is designed to be run both locally and inside CI.
+</p>
+
+<pre><code># Run all simulations
+scripts/sweep.sh sim
+
+# Run synthesis for all targets
+scripts/sweep.sh synth both
+
+# Run everything
+scripts/sweep.sh all both
+</code></pre>
+<p>Sweep script entry points</p>
+
+<p>
+The simulation sweep covers all AXIS tests (register, FIFO, AFIFO across multiple <code>TESTTYPE</code> and backpressure combinations), <code>axil_register</code>, and DMA/CDMA runs with <code>READY_PROB=70</code>. The synthesis sweep covers generic and Artix-7 targets for all synthesisable modules. Because waveform and log filenames are parameter-aware (<code>dma_tt3_rp80.fst</code>, <code>axis_afifo_ff1_tt1_src1_sink1.fst</code>), sweep runs across different parameter combinations never overwrite each other.
+</p>
+
+<p>
+The point of the sweep is not just convenience. Hardware bugs often hide in the corners of a parameter matrix: one FIFO mode works but another fails, one level of backpressure is fine but another exposes a handshake bug, or one synthesis target accepts a construct that another rejects. Running a matrix forces the design through combinations that a single hand-picked smoke test would miss.
+</p>
+
+<p>
+That is also why the script is valuable in CI. Instead of asking every contributor to remember the right list of commands, the project encodes the matrix once in <code>scripts/sweep.sh</code> and reuses it everywhere. Local debug, Docker runs, and GitHub Actions all execute the same regression intent, which keeps the project much easier to trust.
+</p>
+
+<h2 class="section-heading">GitHub Actions CI</h2>
+
+<p>The CI workflow runs automatically on every push and pull request. It reuses the same Docker image so the CI environment matches the local development environment exactly.</p>
+
+<p>
+The workflow YAML is in <code>.github/workflows/</code>. The key steps are: checkout the repository, build the Docker image, and run the sweep script inside the container.
+</p>
+
+<pre><code>name: verilaxi CI
+
+on: [push, pull_request]
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t verilaxi .
+
+      - name: Run simulation sweep
+        run: |
+          docker run --rm -v "$PWD":/workspace -w /workspace verilaxi \
+            ./scripts/sweep.sh sim
+
+  synthesise:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t verilaxi .
+
+      - name: Run synthesis sweep
+        run: |
+          docker run --rm -v "$PWD":/workspace -w /workspace verilaxi \
+            ./scripts/sweep.sh synth both
+</code></pre>
+<p>GitHub Actions workflow for verilaxi</p>
+
+<p>
+Any regression — a simulation that no longer terminates, an assertion that fires, or a synthesis failure — is caught immediately on every push. Contributors do not need to run the full sweep locally before opening a pull request.
+</p>
+
+<h2 class="section-heading">What this gives you</h2>
+
+<p>
+The combination of a pinned Docker environment, a sweep script, and a GitHub Actions workflow eliminates an entire class of "it works here but not there" problems that are common in hardware projects. The repository README no longer needs a section explaining which tool versions to install or which OS was tested. The container is the environment definition, and CI proves it works on every commit.
+</p>
+
+<p>
+The full Dockerfile, sweep script, and CI workflow are available in the <a href="https://github.com/nelsoncsc/verilaxi">verilaxi repository</a>.
+</p>
+
+<p>
+Read next:<br>
+<a href="verilator_tb.html">Building a Verilator Testbench for AXI Designs</a> for the simulation harness that the container and CI jobs are actually running.<br>
+Implementation pointers in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>: <code>Dockerfile</code>, <code>scripts/sweep.sh</code>, and <code>.github/workflows/ci.yml</code>.
+</p>
+
+                    <hr>
+
+                    <p>Also available in <a href="https://github.com/nelsoncsc/verilaxi">GitHub</a>.</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson@sistenix.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <scr

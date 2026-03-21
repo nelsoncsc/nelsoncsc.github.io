@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - SVA protocol checkers for AXI">
+    <meta name="keywords" content="hardware, AXI, SystemVerilog Assertions, SVA, protocol checker, Verilator, verification, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>SVA Protocol Checkers for AXI</title>
+
+    
+    <link rel="canonical" href="https://sistenix.com/axi_sva.html">
+<link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>SVA Protocol Checkers for AXI</h1>
+                        <h2 class="subheading">Catching protocol violations early with SystemVerilog Assertions</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 21, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+<p>
+A testbench that drives stimulus and checks data values is necessary but not sufficient. A DUT can produce correct output values while simultaneously violating the AXI protocol — for example, by dropping VALID between beats without a handshake, or by issuing a burst that crosses a 4KB page boundary. These violations will cause failures in a real system but may go undetected in a functional simulation unless protocol rules are explicitly checked. SystemVerilog Assertions (SVA) are the right tool for this. This post explains the four checker modules in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a> and how they work with Verilator.
+</p>
+
+<h2 class="section-heading">SVA in one minute</h2>
+
+<p>
+Before diving into AXI-specific properties, it helps to decode the basic SVA syntax. A property is a statement about signal behaviour over time. In practice, most protocol checks answer questions such as: "if this happened on one clock edge, what must still be true on the next edge?" or "if this handshake occurred, what condition must hold immediately?".
+</p>
+
+<pre><code>property p_example;
+    @(posedge clk) disable iff (!rst_n)
+    antecedent |=> consequent;
+endproperty
+</code></pre>
+<p>Skeleton of a clocked SVA property</p>
+
+<p>
+In that form:
+</p>
+
+<ul>
+  <li><code>@(posedge clk)</code> means the property is sampled on every rising clock edge.</li>
+  <li><code>disable iff (!rst_n)</code> turns the property off during reset.</li>
+  <li>the <strong>antecedent</strong> is the condition being watched.</li>
+  <li><code>|=&gt;</code> means "if the antecedent is true now, the consequent must be true on the next sampled cycle".</li>
+  <li>the <strong>consequent</strong> is the rule that must hold.</li>
+</ul>
+
+<p>
+For AXI, that maps naturally onto handshake rules. A property such as
+</p>
+
+<pre><code>tvalid && !tready |=> tvalid;
+</code></pre>
+
+<p>
+simply says: if VALID is high and READY is low on this clock edge, then VALID must still be high on the next clock edge. In other words, once the master has offered a transfer, it must keep offering it until the handshake completes.
+</p>
+
+<p>
+Another common operator is <code>|-&gt;</code>, which is used for same-cycle implications. In protocol checkers it is useful for statements like "if a beat is accepted with WLAST high, the internal beat counter must already be at the last beat." The key point is that SVA is not magic syntax to memorise in isolation; it is a compact way of writing temporal protocol rules that designers already describe informally.
+</p>
+
+<h2 class="section-heading">One important caveat: Verilator post-NBA evaluation</h2>
+
+<p>
+Before showing the properties, there is one Verilator-specific behaviour worth understanding upfront, because it affects how every VALID stability property must be written.
+</p>
+
+<p>
+Verilator evaluates <code>assert property</code> consequents in the post-NBA region — after <code>always_ff</code> blocks have settled — rather than in the preponed region mandated by the SystemVerilog specification. This means the checker sees signal values that have already been updated by the current clock edge. If a master correctly deasserts VALID one cycle after a handshake completes, the naive property sees <code>valid=0</code> at that edge and fires a false positive — even though the behaviour is correct.
+</p>
+
+<p>
+Two guards are applied consistently across all properties in verilaxi to handle this:
+</p>
+
+<ul>
+  <li><strong><code>|| tready</code> in the consequent</strong> — allows the master to deassert VALID if READY is high at the next cycle, meaning the handshake completed</li>
+  <li><strong><code>!$fell(tready)</code> in the antecedent</strong> — excludes the cycle where READY transitions from 1 to 0, which can happen when a FIFO fills on the same edge as a handshake</li>
+</ul>
+
+<p>
+All properties shown below include both guards. A spurious deassert — VALID going low while READY is already low — is still caught.
+</p>
+
+<h2 class="section-heading">The four checkers</h2>
+
+<p>
+Verilaxi includes four SVA checker modules, each focused on a specific aspect of the AXI protocol:
+</p>
+
+<ul>
+  <li><code>axis_checker.sv</code> — AXI4-Stream: TVALID stability, payload stability, no-X checks</li>
+  <li><code>axil_checker.sv</code> — AXI4-Lite: per-channel VALID stability, payload stability, error response detection</li>
+  <li><code>axi_mm_checker.sv</code> — AXI4-Full: write and read channel rules, WLAST and RLAST alignment</li>
+  <li><code>axi_4k_checker.sv</code> — 4KB boundary: no AW or AR burst may cross a 4KB page boundary</li>
+</ul>
+
+<p>
+Each checker is a standalone module instantiated inside the test, alongside the DUT. It receives the same interface signals and runs continuously throughout the simulation. A failing assertion stops the simulation immediately and reports the time, hierarchy path, and property name.
+</p>
+
+<h2 class="section-heading">VALID stability</h2>
+
+<p>
+The AXI specification requires that once a master asserts VALID it must not deassert it until the handshake completes (READY goes high). This is the most commonly violated rule when an FSM or driver has a bug. The assertion is straightforward:
+</p>
+
+<p>
+Read the property directly in AXI terms: "if the channel is stalled this cycle (<code>VALID=1</code>, <code>READY=0</code>), then the offer must still be present next cycle." That is exactly the English-language rule from the AXI specification, expressed as a one-line temporal check.
+</p>
+
+<pre><code>// Once TVALID is asserted it must remain high until TREADY goes high
+property p_tvalid_stable;
+    @(posedge clk) disable iff (!rst_n)
+    tvalid && !tready |=> tvalid;
+endproperty
+
+assert property (p_tvalid_stable)
+    else $error("TVALID deasserted without a handshake");
+</code></pre>
+<p>Basic TVALID stability property</p>
+
+<p>
+In Verilator, however, this property fires a false positive at the handshake cycle — for the reason explained at the top of this post. The fix applies the two guards:
+</p>
+
+<pre><code>// Corrected for Verilator post-NBA evaluation
+property p_tvalid_stable;
+    @(posedge clk) disable iff (!rst_n)
+    tvalid && !tready && !$fell(tready) |=> tvalid || tready;
+endproperty
+</code></pre>
+<p>VALID stability property corrected for Verilator's post-NBA evaluation</p>
+
+<h2 class="section-heading">Payload stability</h2>
+
+<p>
+While VALID is asserted and READY is low (no handshake yet), all payload signals — address, data, WLAST, burst parameters — must remain stable. A driver that updates these signals before the handshake completes is presenting incoherent data to the slave.
+</p>
+
+<p>
+This is where the combination of AXI and SVA becomes especially natural. Once the handshake is stalled, the channel payload is logically frozen. The property is therefore the same shape as the VALID rule, but with <code>$stable(...)</code> in the consequent instead of the signal itself.
+</p>
+
+<pre><code>// Payload must not change while TVALID is high and TREADY is low
+property p_tdata_stable;
+    @(posedge clk) disable iff (!rst_n)
+    tvalid && !tready && !$fell(tready) |=> $stable(tdata) || tready;
+endproperty
+
+assert property (p_tdata_stable)
+    else $error("TDATA changed while TVALID high and TREADY low");
+</code></pre>
+<p>Payload stability property for AXI-Stream TDATA</p>
+
+<h2 class="section-heading">WLAST alignment</h2>
+
+<p>
+For AXI4-Full write bursts, WLAST must be asserted on exactly the last beat of the burst — the beat numbered AWLEN. A DUT that asserts WLAST early (truncating the burst) or late (extending it) will confuse the interconnect. The <code>axi_mm_checker</code> counts W-channel beats after each AW handshake and checks that WLAST arrives exactly at beat AWLEN+1.
+</p>
+
+<p>
+Here the property is paired with a small amount of supporting state. SVA is excellent at expressing time relationships, but it often works best when simple helper logic captures context such as the expected burst length. In other words, the checker is not "only assertions"; it is a small monitor plus assertions over that monitor state.
+</p>
+
+<pre><code>// WLAST must be asserted on beat number awlen+1 and not before
+int unsigned beat_count;
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n)
+        beat_count <= 0;
+    else if (wvalid && wready) begin
+        if (wlast) beat_count <= 0;
+        else       beat_count <= beat_count + 1;
+    end
+end
+
+property p_wlast_correct;
+    @(posedge clk) disable iff (!rst_n)
+    wvalid && wready && wlast |-> (beat_count == captured_awlen);
+endproperty
+
+assert property (p_wlast_correct)
+    else $error("WLAST asserted at beat %0d, expected beat %0d",
+                beat_count, captured_awlen);
+</code></pre>
+<p>WLAST alignment check (simplified from <code>tb/assertions/axi_mm_checker.sv</code>)</p>
+
+<h2 class="section-heading">The 4KB boundary rule</h2>
+
+<p>
+The AXI4 specification forbids a burst from crossing a 4KB address boundary. This rule exists because many interconnect fabrics map 4KB pages to different slaves; a burst crossing the boundary would require the interconnect to split it, which most implementations do not support. The rule is subtle: it depends on the burst base address, beat size, and burst length together.
+</p>
+
+<p>
+The check computes the address of the last byte in the burst and verifies it falls within the same 4KB page as the first byte:
+</p>
+
+<p>
+This is a good example of why protocol assertions matter even when the RTL appears straightforward. A burst can have the correct AWLEN, correct AWSIZE, and correct VALID/READY behaviour, yet still be illegal if the resulting address range crosses a page boundary. SVA lets that derived rule be checked continuously instead of relying on a human to infer it from the waveform.
+</p>
+
+<pre><code>// No AW burst may cross a 4KB boundary
+property p_aw_no_4k_cross;
+    logic [ADDR_WIDTH-1:0] last_byte_addr;
+    @(posedge clk) disable iff (!rst_n)
+    (awvalid && awready,
+        last_byte_addr = awaddr + ((awlen + 1) << awsize) - 1)
+    |->
+        (awaddr[11:0] + ((awlen + 1) << awsize)) <= 12'hFFF + 1;
+endproperty
+
+assert property (p_aw_no_4k_cross)
+    else $error("AW burst crosses 4KB boundary: addr=0x%0h len=%0d size=%0d",
+                awaddr, awlen, awsize);
+</code></pre>
+<p>4KB boundary checker for the AW channel (from <code>tb/assertions/axi_4k_checker.sv</code>)</p>
+
+<p>
+This is the check that verilaxi's S2MM and MM2S engines are specifically designed to satisfy. Both engines include a two-stage PREP pipeline that clips burst length at 4KB boundaries before issuing the AW or AR address. The assertion fires immediately if that logic has a bug.
+</p>
+
+<h2 class="section-heading">Enabling assertions in Verilator</h2>
+
+<p>
+Assertions are compiled but silently ignored unless the <code>--assert</code> flag is passed to Verilator. Without it, all <code>assert property</code> and <code>cover property</code> statements are no-ops. In verilaxi this flag is always enabled in <code>mk/config.mk</code>:
+</p>
+
+<pre><code>VERILATOR_FLAGS += --assert
+</code></pre>
+
+<p>
+When an assertion fires, Verilator prints the simulation time, the full hierarchical path of the failing property, and the message from the <code>else $error(...)</code> clause, then terminates the simulation. The FST waveform written up to that point can be opened in Surfer or GTKWave to inspect the signals at and before the failure time.
+</p>
+
+<h2 class="section-heading">Summary</h2>
+
+<p>
+SVA protocol checkers are a lightweight and highly effective addition to any AXI testbench. VALID stability and payload stability catch the most common driver and FSM bugs. WLAST and RLAST alignment checkers catch burst-count errors. The 4KB boundary checker is essential for any engine that issues multi-beat bursts near page boundaries. All four checks in verilaxi are Verilator-compatible, with the post-NBA sampling caveat handled by the <code>!$fell(tready)</code> guard and the <code>|| tready</code> consequent. The full checker source is available in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>.
+</p>
+
+<p>
+Read next:<br>
+<a href="axi_vip.html">Building SystemVerilog AXI VIP for Fast Bring-Up</a> for the task-based environment that these assertions watch.<br>
+<a href="axi_dma.html">AXI DMA — Moving Data Without the CPU</a> for a concrete example where WLAST and 4KB checks matter in practice.<br>
+Implementation pointers in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>: <code>tb/assertions/axis_checker.sv</code>, <code>tb/assertions/axil_checker.sv</code>, <code>tb/assertions/axi_mm_checker.sv</code>, and <code>tb/assertions/axi_4k_checker.sv</code>.
+</p>
+
+<p>References:<br>
+[1] ARM. AMBA AXI and ACE Protocol Specification. 2011<br>
+[2] IEEE Std 1800-2017. SystemVerilog Language Reference Manual.<br>
+[3] <a href="axi_vip.html">Building SystemVerilog AXI VIP for Fast Bring-Up — sistenix.com</a>
+</p>
+
+                    <hr>
+
+                    <p>Also available in <a href="https://github.com/nelsoncsc/verilaxi">GitHub</a>.</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson@sistenix.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <scr

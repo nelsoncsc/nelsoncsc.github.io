@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - AXI DMA and CDMA in SystemVerilog">
+    <meta name="keywords" content="hardware, AXI, DMA, CDMA, AXI4, AXI-Stream, AXI-Lite, SystemVerilog, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>AXI DMA - Moving Data Without the CPU</title>
+
+    
+    <link rel="canonical" href="https://sistenix.com/axi_dma.html">
+<link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                                                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+
+
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>AXI DMA - Moving Data Without the CPU</h1>
+                        <h2 class="subheading">How DMA engines work, and building one in SystemVerilog</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 21, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+<p>
+A processor moving data between a peripheral and memory one word at a time is wasteful: the CPU stays busy for the entire transfer and burns cycles on work that is fundamentally repetitive. A Direct Memory Access (DMA) engine fixes this by taking ownership of the data movement itself. Software programs the source and destination addresses, the transfer length, and a few control bits, then the DMA moves the payload autonomously while the CPU continues with control, scheduling, or higher-level signal-processing tasks.
+</p>
+
+<p>
+This matters in many real systems. Ethernet subsystems use DMAs to move packet buffers between MACs and memory with minimal software involvement. Image-processing and optical-flow pipelines use them to stream pixels, tiles, and intermediate feature maps between accelerators and external memory. The same idea appears anywhere a design must move a large amount of structured data efficiently. This post explains how a streaming DMA and a central DMA (CDMA) are implemented in SystemVerilog using AXI4, using <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a> as a reference.
+</p>
+
+
+<h2 class="section-heading">The two DMA engines in verilaxi</h2>
+
+<p>
+Verilaxi contains two independent DMA IP blocks, each aimed at a different system-level use case.
+</p>
+
+
+<p>
+<strong>snix_axi_dma</strong> is a streaming DMA. It moves data between an AXI4-Stream interface and AXI4-Full memory using two independent engines: S2MM (Stream-to-Memory-Mapped) and MM2S (Memory-Mapped-to-Stream). This is the pattern commonly used in FPGA and SoC datapaths with high-throughput peripherals: an Ethernet MAC, a camera front end, or a video-processing stage produces an AXI stream, and the DMA writes it to external memory. The MM2S engine performs the inverse operation, reading from memory and producing a stream for a downstream accelerator or display pipeline.
+</p>
+
+
+<p>
+<strong>snix_axi_cdma</strong> is a central DMA. It performs memory-to-memory copies over a single AXI4-Full port with no stream interfaces. This is useful when data must be rearranged or relocated entirely inside the memory system, for example when staging image tiles, reorganising buffers for optical-flow processing, or copying packet payloads between software-visible queues. Software programs a source address, destination address, and length; the CDMA reads from the source and writes to the destination.
+</p>
+
+<p>
+In short, the two engines solve related but different problems. A streaming DMA is the natural choice when one side of the transfer is a live data stream: video sensors, Ethernet MACs, DSP chains, or CNN accelerators that consume and produce AXI-Stream data. A CDMA is the better fit when both sides already live in memory and the system simply needs bulk relocation, staging, or reordering. Many practical designs need both: the streaming DMA brings data in and out of memory, while the CDMA reorganises that stored data between processing stages.
+</p>
+
+
+<p>Figure (1) shows the top-level block diagram of the streaming DMA.</p>
+
+<a href="img/verilaxi/dma.svg"><img src="img/verilaxi/dma.svg" class="img-responsive center-block" alt="DMA block diagram"></a>
+<p>Figure (1): The streaming DMA (<code>snix_axi_dma</code>). Software configures the engines via the AXI-Lite CSR. S2MM writes an incoming stream to memory; MM2S reads memory and produces a stream.</p>
+
+<h2 class="section-heading">The S2MM engine</h2>
+
+<p>
+The Stream-to-Memory engine accepts data from an AXI4-Stream slave port and writes it to memory via AXI4-Full write channels (AW, W, B). An internal AXI-Stream FIFO decouples the stream side from the memory bus: the stream can keep running even if the memory bus stalls, up to the FIFO depth.
+</p>
+
+<p>Figure (2) shows the S2MM FSM state diagram.</p>
+
+<a href="img/verilaxi/s2mm_fsm.svg"><img src="img/verilaxi/s2mm_fsm.svg" class="img-responsive center-block" alt="S2MM FSM"></a>
+<p>Figure (2): S2MM FSM. PREP1 and PREP2 pipeline the 4KB boundary check. AW drives the write address channel; WRITE drains the internal FIFO to the W channel; WAIT_BRESP waits for the B response and decides to loop or stop.</p>
+
+<p>
+The two PREP states exist to pipeline the burst calculation. Computing whether the next burst crosses a 4KB boundary — which requires comparing the address and length against a page boundary — would be a long combinational path if done in a single cycle. Splitting it across PREP1 and PREP2 keeps the critical-path depth minimal.
+</p>
+
+<p>
+The timing benefit comes from separating two different jobs. <code>PREP1</code> calculates the page-boundary information: where the next 4KB page begins and how many bytes remain before that boundary. <code>PREP2</code> then decides how much of the pending transfer can be issued in the next burst and updates <code>AWLEN</code>. If both steps were packed into one cycle, the address arithmetic, comparison, clipping logic, and burst-length update would all sit on the same path into the AW channel registers.
+</p>
+
+<p>
+That may still work at low frequency, but in a realistic DMA the boundary arithmetic often sits on the control-path critical path. Pipelining it across two states gives the synthesis tool a shorter combinational cone per cycle, which makes timing closure easier without changing the external DMA behaviour.
+</p>
+
+<pre><code>// Simplified S2MM PREP1 — compute bytes remaining to 4KB boundary
+always_ff @(posedge clk) begin
+    if (state == AW) begin
+        // Address of the first byte past the next 4KB boundary
+        next_4k_boundary <= {axi_addr[ADDR_WIDTH-1:12] + 1, 12'h000};
+        bytes_to_boundary <= next_4k_boundary - axi_addr;
+    end
+end
+
+// PREP2 — clip the burst length at the 4KB boundary
+always_ff @(posedge clk) begin
+    if (state == PREP1) begin
+        if (pending_bytes <= bytes_to_boundary)
+            burst_actual_bytes <= pending_bytes;   // fits within 4KB page
+        else
+            burst_actual_bytes <= bytes_to_boundary;  // clip to boundary
+        awlen_r <= (burst_actual_bytes >> ctrl_wr_size) - 1;
+    end
+end
+</code></pre>
+<p>Two-stage burst calculation in S2MM (simplified from <code>rtl/axi/snix_axi_s2mm.sv</code>)</p>
+
+<p>
+The <code>AWLEN</code> update is worth calling out explicitly. In AXI4, <code>AWLEN</code> is the number of beats in the burst minus one. So on a 64-bit interface, if the clipped burst length is 16 bytes, the burst contains two beats and <code>AWLEN = 1</code>. If the clipped burst length is only 8 bytes, then the burst is one beat and <code>AWLEN = 0</code>.
+</p>
+
+<p>
+Using the numerical example below with a start address of <code>0x0000_0FF0</code> and a 22-byte transfer:
+</p>
+
+<ul>
+  <li>Before the 4KB boundary, 16 bytes fit, so <code>burst_actual_bytes = 16</code> and <code>AWLEN = (16 / 8) - 1 = 1</code>.</li>
+  <li>After the boundary, 6 bytes remain. The DMA still issues one final beat, so the burst is clipped to one beat and <code>AWLEN = 0</code>, with <code>WSTRB</code> marking only the valid six bytes.</li>
+</ul>
+
+<p>
+This is exactly why the PREP logic and the partial-strobe logic belong together conceptually: PREP decides how many beats can legally be issued, and the strobe logic ensures that the last issued beat writes only the bytes that actually belong to the transfer.
+</p>
+
+<h2 class="section-heading">The 4KB boundary rule</h2>
+
+<p>
+The AXI4 specification forbids a burst from crossing a 4KB page boundary. This rule exists because interconnect fabrics map 4KB pages to potentially different slaves; a burst spanning a boundary would require the interconnect to split it, which most implementations do not support. A DMA that ignores this rule will fail silently on any real system with a non-trivial memory map.
+</p>
+
+<p>
+The S2MM engine handles this by running each burst through the two-stage PREP pipeline before issuing the AW handshake. If the programmed burst would cross a 4KB boundary, the engine clips the burst to the boundary, completes that burst, and then starts a new burst at the next page. This continues until all <code>ctrl_wr_transfer_len</code> bytes have been written. The SVA checker in <code>axi_4k_checker.sv</code> verifies that no AW address ever violates this rule during simulation.
+</p>
+
+<p>
+An illustrative test case is the DMA regression with <code>TESTTYPE=3</code>, which combines a 4KB crossing with a transfer whose total byte count is not an integer multiple of the beat width. A concrete example is shown in Table (1).
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Parameter</th><th>Value</th><th>Meaning</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Data width</td><td><code>64 bits</code></td><td>8 bytes per beat</td></tr>
+    <tr><td>Start address</td><td><code>0x0000_0FF0</code></td><td>16 bytes before the next 4KB boundary at <code>0x0000_1000</code></td></tr>
+    <tr><td>Total transfer</td><td><code>22 bytes</code></td><td>Crosses the page boundary and ends with a partial beat</td></tr>
+    <tr><td>Bytes before boundary</td><td><code>16 bytes</code></td><td>Exactly two full 8-byte beats fit in the first page</td></tr>
+    <tr><td>Bytes after boundary</td><td><code>6 bytes</code></td><td>Requires a final partial beat in the next page</td></tr>
+  </tbody>
+</table>
+<p>Table (1): Numerical example of a DMA transfer that crosses a 4KB boundary</p>
+
+<p>
+In this case the DMA must issue two full beats up to address <code>0x0000_0FFF</code>, then restart at <code>0x0000_1000</code> for the remaining 6 bytes. A single burst covering all 22 bytes would violate AXI4, because it would cross the page boundary.
+</p>
+
+<a href="img/verilaxi/dma.png"><img src="img/verilaxi/dma.png" class="img-responsive center-block" alt="DMA waveform with 4KB boundary"></a>
+<p>Figure (3): DMA simulation waveform. The engine issues multiple bursts, automatically splitting at 4KB boundaries.</p>
+
+<h2 class="section-heading">Partial write strobe</h2>
+
+<p>
+When the total transfer length is not a multiple of the beat width, the final beat must use a byte-accurate write strobe (<code>wstrb</code>) so that only valid bytes are committed to memory. The engine computes the number of valid bytes in the last beat and constructs a strobe mask:
+</p>
+
+<pre><code>// Partial last-beat strobe
+logic [DATA_WIDTH/8-1:0] last_beat_strobe;
+int unsigned              remaining_bytes;
+
+assign remaining_bytes  = ctrl_wr_transfer_len % (DATA_WIDTH / 8);
+assign last_beat_strobe = (remaining_bytes == 0) ? '1 :
+                          ((1 << remaining_bytes) - 1);
+
+assign s2mm_wstrb = wlast ? last_beat_strobe : '1;
+</code></pre>
+<p>Partial write strobe for the last beat of a transfer</p>
+
+<p>
+Continuing the same numerical example, the write strobes evolve as shown in Table (2).
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Beat</th><th>Address range</th><th>Valid bytes</th><th><code>WSTRB</code></th></tr>
+  </thead>
+  <tbody>
+    <tr><td>0</td><td><code>0x0FF0 - 0x0FF7</code></td><td>8</td><td><code>8'b1111_1111</code></td></tr>
+    <tr><td>1</td><td><code>0x0FF8 - 0x0FFF</code></td><td>8</td><td><code>8'b1111_1111</code></td></tr>
+    <tr><td>2</td><td><code>0x1000 - 0x1007</code></td><td>6</td><td><code>8'b0011_1111</code></td></tr>
+  </tbody>
+</table>
+<p>Table (2): Beat-by-beat strobe behaviour for a 22-byte transfer on a 64-bit interface</p>
+
+<p>
+The final beat must not write all eight bytes, because only six bytes remain. If the DMA got this wrong and drove <code>8'b1111_1111</code>, it would silently overwrite two bytes beyond the intended end of the buffer.
+</p>
+
+<h2 class="section-heading">Transfer length and throughput</h2>
+
+<p>
+Once the burst structure is understood, it becomes easy to estimate transfer time and throughput. A first-order throughput estimate for an AXI burst engine is
+</p>
+
+<p>
+<code>throughput ~= bytes_per_beat * accepted_beats_per_cycle * clock_frequency</code>
+</p>
+
+<p>
+On a 64-bit data path, <code>bytes_per_beat = 8</code>. If the bus accepts one beat every cycle at <code>200 MHz</code>, the ideal streaming bandwidth is
+</p>
+
+<p>
+<code>8 bytes * 200e6 = 1.6 GB/s</code>
+</p>
+
+<p>
+For a <code>1 MiB</code> transfer, the ideal data-movement time is therefore approximately
+</p>
+
+<p>
+<code>1,048,576 / 1.6e9 ~= 655 us</code>
+</p>
+
+<p>
+Of course, real transfers are slower because AW, W, B, AR, and R handshakes are not all accepted every cycle. Boundary splits, response waits, and backpressure all reduce the number of beats actually transferred per cycle.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Case</th><th>Assumption</th><th>Estimated throughput on 64-bit @ 200 MHz</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Ideal</td><td>1 accepted beat/cycle</td><td><code>1.6 GB/s</code></td></tr>
+    <tr><td>Mild backpressure</td><td>0.8 accepted beats/cycle</td><td><code>1.28 GB/s</code></td></tr>
+    <tr><td>Heavy backpressure</td><td>0.5 accepted beats/cycle</td><td><code>0.8 GB/s</code></td></tr>
+  </tbody>
+</table>
+<p>Table (4): First-order DMA throughput estimates</p>
+
+<p>
+This estimate is intentionally simple, but it is very useful when reasoning about whether a DMA path can keep up with a video stream, a DSP pipeline, or a CNN tensor feed.
+</p>
+
+<h2 class="section-heading">The CDMA: memory-to-memory copy</h2>
+
+<p>
+The central DMA (<code>snix_axi_cdma</code>) uses a single AXI4-Full port for both reading and writing. The MM2MM engine serialises the two phases: the entire read burst completes and fills an internal FIFO before the write burst begins. This simplifies the control path at the cost of bus utilisation — read and write never overlap.
+</p>
+
+<p>Figure (4) shows the CDMA FSM.</p>
+
+<a href="img/verilaxi/mm2mm_fsm.svg"><img src="img/verilaxi/mm2mm_fsm.svg" class="img-responsive center-block" alt="MM2MM FSM"></a>
+<p>Figure (4): MM2MM FSM. The read phase (PREP1 → PREP2 → AR → READ) completes fully before the write phase (AW → WRITE → WAIT_BRESP) begins.</p>
+
+<p>
+Software programs the CDMA through its AXI-Lite CSR. The STATUS register is write-protected and its done bit is cleared automatically when <code>ctrl_start</code> fires, so software does not need to clear STATUS before restarting a transfer.
+</p>
+
+<pre><code>// Typical CDMA software sequence
+write_reg(CDMA_SRC_ADDR,  0x0000_1000);  // source
+write_reg(CDMA_DST_ADDR,  0x0000_2000);  // destination
+write_reg(CDMA_NUM_BYTES, 256);           // length in bytes
+write_reg(CDMA_CTRL, (7 << 6) | (3 << 3) | 0x1);  // 8-beat bursts, 8B/beat, start
+
+while (!(read_reg(STATUS) & 0x1));       // poll for completion
+// No STATUS clear needed — done bit clears on next ctrl_start
+</code></pre>
+<p>CDMA software sequence</p>
+
+<h2 class="section-heading">Circular mode</h2>
+
+<p>
+Both S2MM and MM2S support circular mode. When <code>ctrl_wr_circular</code> or <code>ctrl_rd_circular</code> is set, the engine does not stop after completing the programmed transfer length. Instead it reloads the base address and byte count and immediately restarts, enabling continuous ring-buffer operation. Circular mode is exited by writing the stop bit.
+</p>
+
+<p>
+Circular mode is especially useful in continuous-stream applications. In video processing, a camera or image sensor may produce pixels continuously while the software stack or downstream accelerator consumes frame buffers at its own pace. In that case, circular mode turns memory into a ring buffer: the DMA keeps writing successive frames or line groups without waiting for software to re-arm every transfer. The same idea is useful in Ethernet receive queues, software-defined radio, and DSP pipelines where data arrives continuously and the system wants a rolling buffer instead of a single-shot copy.
+</p>
+
+<p>
+One good way to picture this is a video frame buffer ring. A concrete example is shown in Table (3).
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Frame buffer</th><th>Base address</th><th>Frame size</th><th>Role</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>A</td><td><code>0x8000_0000</code></td><td><code>0x0010_0000</code> bytes</td><td>Current write target</td></tr>
+    <tr><td>B</td><td><code>0x8010_0000</code></td><td><code>0x0010_0000</code> bytes</td><td>Previously captured frame</td></tr>
+    <tr><td>C</td><td><code>0x8020_0000</code></td><td><code>0x0010_0000</code> bytes</td><td>Next buffer in the ring</td></tr>
+  </tbody>
+</table>
+<p>Table (3): Example three-frame circular buffer in memory</p>
+
+<p>
+Suppose a camera produces one frame every 16.7 ms and each frame occupies <code>0x0010_0000</code> bytes. In circular S2MM mode, the DMA writes frame 0 into buffer A, then frame 1 into buffer B, then frame 2 into buffer C. When the programmed frame size has been written, the write address wraps back to <code>0x8000_0000</code> and frame 3 overwrites buffer A. At the same time an MM2S engine or software can read the previously buffered frame from B or C. The address restart is not an error here; it is the intended behaviour of a ring buffer.
+</p>
+
+<p>
+Non-circular mode is just as important. It is the right choice when a transfer has a clear beginning and end and completion matters as an event: transmit one Ethernet packet, move one CNN tensor tile, copy one DSP input block, or fetch one frame buffer for display. In these cases software usually wants a done flag or interrupt, not an endlessly wrapping engine. One-shot mode is also easier to reason about when memory ownership changes from producer to consumer after each completed transfer.
+</p>
+
+<p>
+This also mirrors how many video systems work in practice. Circular mode is ideal while frames are being captured continuously into memory. Non-circular mode is ideal once a complete buffered frame must be processed, copied, or displayed as a bounded job. The same design can therefore use circular streaming for acquisition and one-shot transfers for explicit downstream processing.
+</p>
+
+<p>
+So the practical mapping is straightforward:
+</p>
+
+<p>
+<strong>Streaming DMA + circular mode</strong> fits continuous sources and sinks such as cameras, video pipelines, Ethernet RX rings, and long-running DSP streams.<br>
+<strong>Streaming DMA + non-circular mode</strong> fits bounded stream transfers such as packet TX/RX, frame-at-a-time video processing, or explicit accelerator jobs.<br>
+<strong>CDMA + non-circular mode</strong> fits deliberate memory-to-memory copies such as tensor staging, tile rearrangement, packet-buffer relocation, or software-managed frame moves.<br>
+<strong>CDMA + circular-style operation</strong> is less common, but can still be useful for repeated memory-buffer rotation in pipeline-oriented systems.
+</p>
+
+<a href="img/verilaxi/cdma.png"><img src="img/verilaxi/cdma.png" class="img-responsive center-block" alt="CDMA waveform"></a>
+<p>Figure (5): CDMA waveform. The MM2MM engine reads from the source address, buffers in the internal FIFO, then writes to the destination.</p>
+
+<h2 class="section-heading">Running the simulation</h2>
+
+<pre><code># DMA: 4KB boundary test with backpressure
+make run TESTNAME=dma TESTTYPE=3 READY_PROB=80
+
+# CDMA: basic aligned copy
+make run TESTNAME=cdma TESTTYPE=0
+
+# CDMA: 4KB boundary + partial last beat
+make run TESTNAME=cdma TESTTYPE=1 READY_PROB=70
+</code></pre>
+<p>Running DMA and CDMA simulations with verilaxi</p>
+
+<p>
+The default DMA regression exercises circular mode, while <code>TESTTYPE=3</code> focuses on the 4KB-boundary and partial-strobe corner case. There is also a dedicated circular test in the testbench that drives multiple frames through the ring and checks that the write and read wrap counters stay in lockstep. That combination is useful because it covers both categories of real bugs: corner cases at transfer boundaries, and long-running errors that only appear after several address wraps.
+</p>
+
+<p>
+Backpressure directly affects throughput in these tests. If <code>READY_PROB=100</code>, the AXI slave is always ready and the DMA approaches its ideal burst rate. If <code>READY_PROB=70</code>, then on average only about 70% of the candidate AW, W, or AR cycles are accepted. As a rough throughput model, the effective bandwidth scales with that acceptance rate. So a path that could ideally sustain <code>1.6 GB/s</code> on a 64-bit, 200 MHz interface may fall toward <code>1.12 GB/s</code> when the effective beat acceptance is only 70%.
+</p>
+
+<p>
+That is exactly why the backpressure tests matter. They are not only checking functional correctness under stalls; they also show how much real throughput the engine preserves once the memory system stops behaving ideally.
+</p>
+
+<h2 class="section-heading">Summary</h2>
+
+<p>
+A streaming DMA engine (S2MM/MM2S) moves data efficiently between an AXI-Stream interface and AXI4 memory, while a CDMA engine performs memory-to-memory copies over a single AXI4 port. Together they cover a wide range of practical systems: Ethernet buffering, image and video pipelines, optical-flow accelerators, and general-purpose embedded data movement.
+</p>
+
+<p>
+The streaming DMA is best when a live stream meets memory; the CDMA is best when memory must be reorganised without a stream endpoint. Circular mode fits continuous producers and consumers such as video, Ethernet rings, and long DSP pipelines, while non-circular mode fits bounded transfers where software wants explicit completion per job. Both engines must still get the details right: respect the AXI4 4KB boundary rule, generate correct last-beat strobes, and expose a software-friendly control path through an AXI-Lite CSR. Those details are what make the difference between a DMA that works in a toy testbench and one that behaves correctly in a real design. The full RTL for both engines, their CSRs, and integration tests is available in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>.
+</p>
+
+<p>
+Read next:<br>
+<a href="axi_csr.html">Writing a CSR Block Using AXI-Lite</a> for the software-visible control path behind the engines.<br>
+<a href="fifo_cdc.html">Synchronous and Asynchronous FIFOs</a> for the buffering and clock-crossing pieces that often sit around a DMA datapath.<br>
+<a href="axi_sva.html">Checking AXI Protocol with SystemVerilog Assertions</a> for the protocol rules that guard burst length, WLAST, and 4KB splitting.<br>
+Implementation pointers in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>: <code>rtl/axi/snix_axi_dma.sv</code>, <code>rtl/axi/snix_axi_s2mm.sv</code>, <code>rtl/axi/snix_axi_mm2s.sv</code>, and <code>rtl/axi/snix_axi_cdma.sv</code>.
+</p>
+
+
+<p>References:<br>
+[1] ARM. AMBA AXI and ACE Protocol Specification. 2011<br>
+[2] <a href="axi_csr.html">Writing a CSR Block Using AXI-Lite — sistenix.com</a><br>
+[3] <a href="fifo_cdc.html">Synchronous and Asynchronous FIFOs — sistenix.com</a>
+</p>
+
+                    <hr>
+
+                    <p>Also available in <a href="https://github.com/nelsoncsc/verilaxi">GitHub</a>.</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson@sistenix.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <scr

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - Writing a CSR block using AXI-Lite">
+    <meta name="keywords" content="hardware, AXI-Lite, CSR, control registers, status registers, SystemVerilog, DMA, semaphore, fork join, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>Writing a CSR Block Using AXI-Lite</title>
+
+    
+    <link rel="canonical" href="https://sistenix.com/axi_csr.html">
+<link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                                                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+
+
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>Writing a CSR Block Using AXI-Lite</h1>
+                        <h2 class="subheading">How control and status registers are built and wired up in hardware</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 21, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+<p>
+Almost every hardware IP block has a software-visible register interface. A DMA engine needs registers for the destination address, transfer length, and a start bit. A signal processing block needs registers to configure filter coefficients and report errors. These registers are called Control and Status Registers (CSR). This post explains how a CSR block is implemented in SystemVerilog with an AXI-Lite slave interface, using the DMA CSR from <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a> as a concrete example.
+</p>
+
+<h2 class="section-heading">Why AXI-Lite for a register interface?</h2>
+
+<p>
+AXI-Lite is a simplified subset of AXI4. It removes burst support — every transaction is a single beat — and drops the ID channel. This makes it ideal for register maps: no burst logic is needed, the address space is small, and the hardware area is minimal. AXI4-Full would be wasteful for a block that handles one register write at a time.
+</p>
+
+<h2 class="section-heading">The register map</h2>
+
+<p>
+The DMA CSR (<code>snix_axi_dma_csr</code>) provides seven registers. Table (1) shows the complete map.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Offset</th><th>Name</th><th>Access</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>0x00</code></td><td>WR_CTRL</td><td>R/W</td><td>S2MM control: start, stop, circular mode, burst size and length</td></tr>
+    <tr><td><code>0x04</code></td><td>WR_NUM_BYTES</td><td>R/W</td><td>S2MM total transfer length in bytes</td></tr>
+    <tr><td><code>0x08</code></td><td>WR_ADDR</td><td>R/W</td><td>S2MM AXI write base address</td></tr>
+    <tr><td><code>0x0C</code></td><td>RD_CTRL</td><td>R/W</td><td>MM2S control: start, stop, circular mode, burst size and length</td></tr>
+    <tr><td><code>0x10</code></td><td>RD_NUM_BYTES</td><td>R/W</td><td>MM2S total transfer length in bytes</td></tr>
+    <tr><td><code>0x14</code></td><td>RD_ADDR</td><td>R/W</td><td>MM2S AXI read base address</td></tr>
+    <tr><td><code>0x18</code></td><td>STATUS</td><td>R/W1C</td><td>Done flags (sticky; write 0 to clear)</td></tr>
+  </tbody>
+</table>
+<p>Table (1): DMA CSR register map</p>
+
+<h2 class="section-heading">The write path</h2>
+
+<p>
+The AXI-Lite write path involves three channels: AW (address), W (data), and B (response). The CSR accepts the write address and write data independently and commits the write when both have been received. The response is always OKAY.
+</p>
+
+<p>
+The AXI specification intentionally decouples the AW and W channels so a master can pipeline the address without waiting for data to be ready, and vice versa. In practice this means a CSR may receive the write address before the write data, or the write data before the address. A naive implementation that expects them to arrive in a fixed order will deadlock on certain interconnects or master implementations. The correct approach — latching each channel independently and committing only when both are present — handles all arrival orderings without stalls.
+</p>
+
+<pre><code>// Write path — simplified from snix_axi_dma_csr.sv
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        aw_addr_latched <= '0;
+        aw_valid_latched <= 1'b0;
+        w_data_latched   <= '0;
+        w_valid_latched  <= 1'b0;
+    end else begin
+        // Latch AW channel
+        if (s_axil_awvalid && s_axil_awready) begin
+            aw_addr_latched  <= s_axil_awaddr;
+            aw_valid_latched <= 1'b1;
+        end
+        // Latch W channel
+        if (s_axil_wvalid && s_axil_wready) begin
+            w_data_latched  <= s_axil_wdata;
+            w_valid_latched <= 1'b1;
+        end
+        // Commit write when both channels have been received
+        if (aw_valid_latched && w_valid_latched) begin
+            regs[aw_addr_latched[ADDR_WIDTH-1:2]] <= w_data_latched;
+            aw_valid_latched <= 1'b0;
+            w_valid_latched  <= 1'b0;
+            bvalid_r         <= 1'b1;
+        end
+        if (s_axil_bready && bvalid_r)
+            bvalid_r <= 1'b0;
+    end
+end
+
+assign s_axil_bresp  = 2'b00;   // always OKAY
+assign s_axil_bvalid = bvalid_r;
+</code></pre>
+<p>AXI-Lite write path — address and data latched independently, committed when both arrive</p>
+
+<h2 class="section-heading">The read path</h2>
+
+<p>
+The read path is simpler: the CSR captures the read address, drives the register value onto RDATA, and asserts RVALID. The read is registered through a <code>snix_register_slice</code> to improve timing closure.
+</p>
+
+<pre><code>// Read path — simplified
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        rvalid_r <= 1'b0;
+        rdata_r  <= '0;
+    end else begin
+        if (s_axil_arvalid && s_axil_arready) begin
+            rdata_r  <= regs[s_axil_araddr[ADDR_WIDTH-1:2]];
+            rvalid_r <= 1'b1;
+        end
+        if (s_axil_rready && rvalid_r)
+            rvalid_r <= 1'b0;
+    end
+end
+
+assign s_axil_rdata  = rdata_r;
+assign s_axil_rresp  = 2'b00;
+assign s_axil_rvalid = rvalid_r;
+</code></pre>
+<p>AXI-Lite read path — register value captured on AR handshake, presented on R channel</p>
+
+<h2 class="section-heading">Self-clearing control bits</h2>
+
+<p>
+The start and stop bits in WR_CTRL and RD_CTRL are self-clearing: the CSR clears them one cycle after they are written. The DMA engine detects these as rising-edge pulses. Software writes a 1 to start the engine; it does not need to write a 0 to clear it, because the hardware does that automatically.
+</p>
+
+<pre><code>// Self-clearing start/stop bits
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        regs[WR_CTRL][0] <= 1'b0;   // ctrl_wr_start
+        regs[WR_CTRL][1] <= 1'b0;   // ctrl_wr_stop
+    end else begin
+        // Clear one cycle after being set
+        if (regs[WR_CTRL][0]) regs[WR_CTRL][0] <= 1'b0;
+        if (regs[WR_CTRL][1]) regs[WR_CTRL][1] <= 1'b0;
+    end
+end
+</code></pre>
+<p>Self-clearing start and stop bits in WR_CTRL</p>
+
+<h2 class="section-heading">Sticky status bits</h2>
+
+<p>
+The STATUS register holds the done flags from the DMA engines. These flags are set by the hardware (a one-cycle pulse from the engine FSM) and remain set until software writes 0 to clear them. A slow-polling CPU will not miss a completion event because the flag stays set until explicitly cleared. The hardware-driven input takes priority over the software write path.
+</p>
+
+<pre><code>// Sticky STATUS bits — set by hardware, cleared by software
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        regs[STATUS] <= '0;
+    end else begin
+        // Hardware sets the done bits (one-cycle pulse from engine)
+        if (ctrl_wr_done) regs[STATUS][0] <= 1'b1;
+        if (ctrl_rd_done) regs[STATUS][1] <= 1'b1;
+
+        // Software clears by writing 0 (write takes effect only if hardware
+        // is not simultaneously setting)
+        if (status_sw_write && !ctrl_wr_done)
+            regs[STATUS][0] <= w_data_latched[0];
+        if (status_sw_write && !ctrl_rd_done)
+            regs[STATUS][1] <= w_data_latched[1];
+    end
+end
+</code></pre>
+<p>Sticky STATUS bits: hardware sets, software clears</p>
+
+<h2 class="section-heading">A typical software sequence</h2>
+
+<p>
+From a firmware or driver perspective, using the DMA CSR requires four steps: configure the address, configure the length, write the control word with the start bit, then poll STATUS until done.
+</p>
+
+<pre><code>// 1. Set write destination address
+write_reg(WR_ADDR,      0x8000_0000);
+
+// 2. Set transfer length in bytes
+write_reg(WR_NUM_BYTES, 1024);
+
+// 3. Configure burst parameters and start
+//    awsize=3 (8 bytes/beat), awlen=7 (8-beat bursts), start=1
+write_reg(WR_CTRL, (7 << 6) | (3 << 3) | 0x1);
+
+// 4. Poll STATUS[0] until S2MM done
+while (!(read_reg(STATUS) & 0x1));
+
+// 5. Clear the done flag
+write_reg(STATUS, 0x0);
+</code></pre>
+<p>Typical software sequence for a DMA write transfer</p>
+
+<h2 class="section-heading">Why polling is not enough</h2>
+
+<p>
+Polling the STATUS register is useful, but it answers only one question: "has the DMA finished?" It does <em>not</em> guarantee that only one software thread is configuring the DMA at a time. If two software threads both see the DMA idle and then begin writing CSR fields concurrently, the final programmed transfer can become a mixture of both threads' settings.
+</p>
+
+<p>
+For example, thread A may write the source address, thread B may overwrite the destination address, thread A may write the transfer length, and thread B may finally write the start bit. The DMA will then launch, but the register set no longer belongs to one coherent request. Polling alone cannot prevent this race because both threads can observe "idle" before either has finished programming the CSR block.
+</p>
+
+<p>
+This is why the verilaxi testbench uses an <code>axil_lock</code> around AXI-Lite CSR accesses when forked threads are active. The lock is not a hardware register inside the DMA; it is a software-side reservation mechanism in the testbench, implemented as a semaphore, that ensures only one thread at a time performs the AXI-Lite write sequence.
+</p>
+
+<pre><code>// Serialise AXI-Lite CSR writes in the testbench
+axil_lock.get();
+axil_m.write(WR_ADDR,      dst_addr);
+axil_m.write(WR_NUM_BYTES, n_bytes);
+axil_m.write(WR_CTRL,      ctrl_word | 32'h1); // start
+axil_lock.put();
+</code></pre>
+<p>Testbench-side AXI-Lite lock around DMA configuration</p>
+
+<p>
+The analogy in software is simple: polling checks whether the DMA is busy, while the lock claims ownership of the CSR interface. A useful way to picture it is a key to a room. Polling tells you whether the room is occupied; the lock gives you the key so that nobody else enters while you are setting things up.
+</p>
+
+<p>
+Once the lock is held, software can write source address, destination address, length, and control fields as one coherent transaction sequence. Then it asserts <code>start</code>, releases the lock, and either waits for completion or lets another thread program the next transfer later. In other words, the lock serialises access to the CSR block, while the DMA itself still executes transfers normally in the background.
+</p>
+
+<h2 class="section-heading">Connecting the CSR to the engine</h2>
+
+<p>
+The CSR outputs a packed register bus. The top-level DMA wrapper (<code>snix_axi_dma</code>) decodes this bus into individual control signals and drives them into the S2MM and MM2S engines. The engines' done pulses are driven back into the CSR's <code>read_status_reg</code> input, closing the status feedback loop in hardware.
+</p>
+
+<pre><code>// In snix_axi_dma.sv (top-level)
+snix_axi_dma_csr csr (
+    .clk              (clk),
+    .rst_n            (rst_n),
+    .s_axil_*         (s_axil.*),
+    .config_status_reg(csr_regs),
+    .read_status_reg  ({ctrl_rd_done, ctrl_wr_done})
+);
+
+// Decode CSR outputs to engine control signals
+assign ctrl_wr_start       = csr_regs[WR_CTRL][0];
+assign ctrl_wr_stop        = csr_regs[WR_CTRL][1];
+assign ctrl_wr_circular    = csr_regs[WR_CTRL][2];
+assign ctrl_wr_size        = csr_regs[WR_CTRL][5:3];
+assign ctrl_wr_len         = csr_regs[WR_CTRL][13:6];
+assign ctrl_wr_transfer_len= csr_regs[WR_NUM_BYTES];
+assign ctrl_wr_addr        = csr_regs[WR_ADDR];
+</code></pre>
+<p>CSR instantiation and register decoding in the DMA top-level</p>
+
+<h2 class="section-heading">Serialising concurrent CSR access with axil_lock</h2>
+
+<p>
+In a testbench that runs the S2MM and MM2S engines concurrently, both engines share the same AXI-Lite master to access the CSR. This creates a concurrency problem: if two threads issue AXI-Lite transactions at the same time, their AW, W, and B channel handshakes will interleave and the CSR will receive corrupted writes.
+</p>
+
+<p>
+The standard SystemVerilog solution is a semaphore. In verilaxi's <code>axi_dma_driver</code>, an <code>axil_lock</code> semaphore serialises all AXI-Lite accesses. Every task that touches the CSR — <code>config_wr_dma()</code>, <code>config_rd_dma()</code>, <code>wait_wr_done()</code>, <code>wait_rd_done()</code> — acquires the semaphore before driving the bus and releases it immediately after. Any thread that tries to access the CSR while the semaphore is held blocks until the current transaction completes.
+</p>
+
+<pre><code>// Inside axi_dma_driver — serialising concurrent CSR access
+semaphore axil_lock = new(1);  // initialised with one key
+
+task config_wr_dma();
+    axil_lock.get(1);            // acquire — blocks if another thread holds it
+    axil_m.write(WR_ADDR,       wr_addr);
+    axil_m.write(WR_NUM_BYTES,  wr_num_bytes);
+    axil_m.write(WR_CTRL,       (wr_len << 6) | (wr_size << 3) | 1);
+    axil_lock.put(1);            // release
+endtask
+
+task config_rd_dma();
+    axil_lock.get(1);
+    axil_m.write(RD_ADDR,       rd_addr);
+    axil_m.write(RD_NUM_BYTES,  rd_num_bytes);
+    axil_m.write(RD_CTRL,       (rd_len << 6) | (rd_size << 3) | 1);
+    axil_lock.put(1);
+endtask
+</code></pre>
+<p>axil_lock semaphore serialising concurrent CSR access in <code>axi_dma_driver</code></p>
+
+<p>
+This matters in practice because DMA tests often launch the write and read engines simultaneously with <code>fork ... join</code>. Without the semaphore, the two threads race on the AXI-Lite bus and the CSR sees garbled register writes. With the semaphore, the second thread simply waits a few clock cycles until the first has finished its configuration sequence, then proceeds cleanly.
+</p>
+
+<pre><code>// Launching S2MM and MM2S concurrently — safe because axil_lock serialises CSR access
+fork
+    begin
+        dma_drv.config_wr_dma();       // acquires lock, configures S2MM, releases
+        dma_drv.write_stream(wr_data); // stream side — no CSR access
+        dma_drv.wait_wr_done();        // acquires lock to poll STATUS, releases
+    end
+    begin
+        dma_drv.config_rd_dma();       // acquires lock, configures MM2S, releases
+        dma_drv.read_stream(rd_data);  // stream side — no CSR access
+        dma_drv.wait_rd_done();        // acquires lock to poll STATUS, releases
+    end
+join
+</code></pre>
+<p>Concurrent S2MM and MM2S launch using fork…join — the semaphore prevents CSR bus contention</p>
+
+<p>
+The semaphore also protects the polling loop in <code>wait_wr_done()</code> and <code>wait_rd_done()</code>. Each poll is a complete AXI-Lite read transaction; if the other thread is simultaneously writing a control register, the poll and the write would collide on the bus. The lock ensures they never overlap.
+</p>
+
+<h2 class="section-heading">Summary</h2>
+
+<p>
+A CSR block is an AXI-Lite slave that decouples software from hardware. The write path latches the address and data channels independently and commits when both arrive — handling all AW/W arrival orderings without deadlock. The read path returns the current register value on the AR handshake. Self-clearing bits let software issue pulses without manual cleanup. Sticky status bits ensure a slow-polling CPU never misses a completion event. When multiple threads share one AXI-Lite master, a semaphore serialises access and prevents bus contention. The full CSR implementation for the DMA and CDMA engines is in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>.
+</p>
+
+<p>
+Read next:<br>
+<a href="axi_dma.html">AXI DMA — Moving Data Without the CPU</a> for the engines driven by these registers.<br>
+<a href="axi_vip.html">Building SystemVerilog AXI VIP for Fast Bring-Up</a> for the task-based AXI-Lite driver used to program the CSR block in simulation.<br>
+Implementation pointers in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>: <code>rtl/axil/snix_axi_dma_csr.sv</code> and <code>rtl/axil/snix_axi_cdma_csr.sv</code>.
+</p>
+
+<p>References:<br>
+[1] ARM. AMBA AXI and ACE Protocol Specification. 2011<br>
+[2] <a href="amba.html">AMBA AXI Protocol — sistenix.com</a><br>
+[3] <a href="axi_dma.html">AXI DMA — Moving Data Without the CPU — sistenix.com</a>
+</p>
+
+                    <hr>
+
+                    <p>Also available in <a href="https://github.com/nelsoncsc/verilaxi">GitHub</a>.</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson@sistenix.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <scr
