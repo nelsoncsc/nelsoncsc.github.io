@@ -140,9 +140,58 @@ Another common operator is <code>|-&gt;</code>, which is used for same-cycle imp
 Before showing the properties, there is one Verilator-specific behaviour worth understanding upfront, because it affects how every VALID stability property must be written.
 </p>
 
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Region</th><th>What happens</th><th>Why it matters here</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>Preponed</code></td><td>Assertion sampling point defined by the SystemVerilog language model</td><td>The ideal place to observe handshake intent before sequential updates react to the same edge</td></tr>
+    <tr><td><code>Active</code></td><td>Procedural blocks and combinational logic evaluate using values visible at the clock edge</td><td>This is where an AXI handshake is conceptually decided from <code>VALID &amp;&amp; READY</code></td></tr>
+    <tr><td><code>NBA</code></td><td>Non-blocking assignments (<code>&lt;=</code>) from <code>always_ff</code> take effect</td><td>FIFO full flags, counters, and registered READY signals may update because the beat was just accepted</td></tr>
+    <tr><td><code>Post-NBA</code></td><td>The design is observed after those sequential updates have settled</td><td>A checker can see <code>TREADY=0</code> on the same edge where the transfer was actually accepted</td></tr>
+  </tbody>
+</table>
+<p>Table (1): Simulation regions relevant to the Verilator assertion caveat</p>
+
 <p>
 Verilator evaluates <code>assert property</code> consequents in the post-NBA region — after <code>always_ff</code> blocks have settled — rather than in the preponed region mandated by the SystemVerilog specification. This means the checker sees signal values that have already been updated by the current clock edge. If a master correctly deasserts VALID one cycle after a handshake completes, the naive property sees <code>valid=0</code> at that edge and fires a false positive — even though the behaviour is correct.
 </p>
+
+<p>
+It helps to picture one clock edge as a sequence of simulation regions rather than a single instant. In the <em>active</em> region, the current values of VALID and READY determine whether a handshake happened. In the <em>non-blocking assignment</em> (NBA) region, the flops update: FIFOs may become full, internal state advances, and READY may drop as a consequence of the just-accepted beat. In the <em>post-NBA</em> observation point, the checker sees those updated values. So a transfer can legally complete in the active region, yet by the time the assertion samples the same edge, READY already looks low because the design has reacted to that transfer.
+</p>
+
+<p>
+For this discussion, the most useful mental model is not the full scheduler diagram but a short sequence of steps:
+</p>
+
+<ol>
+  <li><strong>Preponed</strong> — concurrent assertions conceptually sample signals for this time slot before design updates react to the edge.</li>
+  <li><strong>Active</strong> — procedural code runs; blocking assignments take effect immediately; non-blocking assignments are evaluated and scheduled; an AXI handshake is logically determined from the values visible at the edge.</li>
+  <li><strong>NBA</strong> — updates from <code>&lt;=</code> take effect; FIFO full flags, counters, and registered READY signals may change because a beat was just accepted.</li>
+  <li><strong>Observed / post-NBA view</strong> — the checker sees the design after those sequential updates have landed.</li>
+</ol>
+
+<p>
+That distinction between <em>"what happened at the edge"</em> and <em>"what the design looks like after reacting to the edge"</em> is the whole heart of the caveat. Assertions want to reason about the first view. In this Verilator-specific corner case, the checker effectively sees more of the second view.
+</p>
+
+<p>
+That is exactly the corner case in the verilaxi stream checker. Imagine a FIFO that was <em>not</em> full before the edge, so the final free slot is accepted with <code>TVALID=1</code> and <code>TREADY=1</code>. The handshake is therefore valid. Then the FIFO full flag updates in the NBA region, which drives <code>TREADY</code> low. A post-NBA checker now sees <code>TVALID=1</code> and <code>TREADY=0</code> on that same edge and may incorrectly conclude that the channel was stalled, even though the beat was just accepted.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Step</th><th>Signal view</th><th>Interpretation</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>At the clock edge</td><td><code>TVALID=1</code>, <code>TREADY=1</code></td><td>The transfer is accepted</td></tr>
+    <tr><td>After NBA updates</td><td>FIFO becomes full, <code>TREADY</code> drops to <code>0</code></td><td>The design reacts to the accepted beat</td></tr>
+    <tr><td>Checker sees the edge</td><td><code>TVALID=1</code>, <code>TREADY=0</code></td><td>A naive stalled-channel property may misclassify the edge</td></tr>
+    <tr><td>Next cycle</td><td>The master may legally deassert <code>TVALID</code></td><td>The beat was already consumed on the previous edge</td></tr>
+  </tbody>
+</table>
+<p>Table (2): Why a completed handshake can look like a stall to a post-NBA observer</p>
 
 <p>
 Two guards are applied consistently across all properties in verilaxi to handle this:
@@ -156,6 +205,29 @@ Two guards are applied consistently across all properties in verilaxi to handle 
 <p>
 All properties shown below include both guards. A spurious deassert — VALID going low while READY is already low — is still caught.
 </p>
+
+<p>
+In other words, the fix is not "turn the rule off when Verilator gets confused." The fix is to ask a slightly more precise question: was the channel truly stalled for a whole cycle, or did READY only appear low because the design consumed a beat and updated its state immediately afterwards? The <code>!$fell(tready)</code> term removes that ambiguous edge, and the <code>|| tready</code> term allows VALID or payload to change on the next cycle if the previous cycle actually completed a handshake.
+</p>
+
+<h2 class="section-heading">Waveforms and sampled interfaces</h2>
+
+<p>
+There is a related but separate source of confusion when reading waveforms in verilaxi. Some tests use helper modules such as <code>sample_axis_if</code> to copy one interface into another on the clock edge before dumping waveforms. These sampled interfaces are useful because they make the captured traffic cleaner to inspect, especially when the original activity is driven through virtual interfaces and class-based BFMs.
+</p>
+
+<p>
+That waveform convenience is <em>not</em> the same issue as the post-NBA assertion caveat. A sampled interface is simply a registered mirror of another interface, so it may lag or clean up what you see in the wave dump. The assertion caveat, by contrast, is about which simulation region the checker observes for the same clock edge. Both affect what a human sees during debug, but only the latter changes whether a naive SVA can produce a false positive.
+</p>
+
+<p>
+So the practical debugging advice is:
+</p>
+
+<ul>
+  <li>If a waveform looks one cycle "cleaner" or more delayed than expected, check whether you are looking at a sampled interface used for observability.</li>
+  <li>If an assertion seems to complain even though the handshake looks legal, think about preponed versus post-NBA observation of the same edge.</li>
+</ul>
 
 <h2 class="section-heading">The four checkers</h2>
 
