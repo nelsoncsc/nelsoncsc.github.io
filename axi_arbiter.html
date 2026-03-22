@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - AXI-Stream round-robin arbiters in SystemVerilog">
+    <meta name="keywords" content="hardware, AXI-Stream, AXIS, arbiter, round robin, weighted arbitration, SystemVerilog, Verilator, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>AXI-Stream Arbitration in SystemVerilog</title>
+
+    <link rel="canonical" href="https://sistenix.com/axi_arbiter.html">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>AXI-Stream Arbitration in SystemVerilog</h1>
+                        <h2 class="subheading">Packet, beat, and weighted round-robin policies in verilaxi</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 22, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+
+<p>
+AXI-Stream systems often need several producers to share a common downstream path. A video pipeline may merge several processing stages into one output. A packet switch may combine multiple sources before transmission. A verification environment may multiplex several traffic generators into a single sink. In all of these cases an arbiter decides who gets access to the shared stream.
+</p>
+
+<p>
+At first glance this looks like a mux plus some priority logic. In practice the policy matters a great deal. Should the arbiter switch source every cycle, or only at packet boundaries? Should all sources receive equal service, or should one stream receive more bandwidth? These choices affect fairness, packet integrity, backpressure behavior, and how reusable the block is across designs.
+</p>
+
+<p>
+In <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>, the AXI-Stream arbiter explores three policies in a single parameterized module:
+</p>
+
+<ul>
+  <li>packet-based round-robin</li>
+  <li>beat-based round-robin</li>
+  <li>weighted packet arbitration</li>
+</ul>
+
+<p>
+Figure (1) shows the arbiter.
+</p>
+
+<a href="img/verilaxi/axis_arbiter.svg"><img src="img/verilaxi/axis_arbiter.svg" class="img-responsive center-block" alt="AXI-Stream arbiter block diagram"></a>
+<p>Figure (1): AXI-Stream arbiter in <code>verilaxi</code>.</p>
+
+<h2 class="section-heading">Why the policy matters</h2>
+
+<p>
+If AXI-Stream beats are independent, beat-by-beat arbitration is attractive. The arbiter can rotate after every accepted transfer and share bandwidth finely across all sources.
+</p>
+
+<p>
+However, AXI-Stream often carries packets, video lines, or frames. In those cases <code>TLAST</code> marks a meaningful boundary. If arbitration changes source mid-packet, the sink observes an interleaved stream where beats from different packets are mixed together. For most packet-oriented sinks that is the wrong behavior, and it is not recoverable without additional framing logic downstream.
+</p>
+
+<p>
+This is why packet-based arbitration is a good default. Once a source wins, it keeps ownership until the last beat handshakes:
+</p>
+
+<pre><code>TVALID &amp;&amp; TREADY &amp;&amp; TLAST</code></pre>
+
+<p>
+Only then does the arbiter rotate to the next source.
+</p>
+
+<h2 class="section-heading">Parameters and interface</h2>
+
+<p>
+The arbiter is a single module. All N source ports are packed into arrays rather than using SystemVerilog interfaces on the synthesizable boundary, which keeps the RTL tool-agnostic:
+</p>
+
+<pre><code>module snix_axis_arbiter #(
+    parameter int  NUM_SRCS    = 4,
+    parameter int  DATA_WIDTH  = 8,
+    parameter int  USER_WIDTH  = 1,
+    parameter bit  HOLD_PACKET = 1'b1,
+    parameter int  WEIGHT_W    = 4,
+    parameter logic [NUM_SRCS*WEIGHT_W-1:0] WEIGHTS = '0
+) (
+    input  logic clk, rst_n,
+    input  logic [NUM_SRCS-1:0][DATA_WIDTH-1:0] s_axis_tdata,
+    input  logic [NUM_SRCS-1:0]                 s_axis_tvalid,
+    input  logic [NUM_SRCS-1:0]                 s_axis_tlast,
+    output logic [NUM_SRCS-1:0]                 s_axis_tready,
+    output logic [DATA_WIDTH-1:0] m_axis_tdata,
+    output logic                  m_axis_tvalid,
+    output logic                  m_axis_tlast,
+    input  logic                  m_axis_tready);</code></pre>
+
+<p>
+Two parameters control the arbitration policy:
+</p>
+
+<ul>
+  <li><code>HOLD_PACKET</code>: <code>1</code> gives packet mode (hold the grant until <code>TLAST</code>); <code>0</code> gives beat mode (release after every accepted beat). All three policies live in the same RTL — switching modes is a single parameter change.</li>
+  <li><code>WEIGHTS</code>: a packed vector of per-source service weights with source 0 in the least-significant bits. The default <code>'0</code> gives each source equal weight.</li>
+</ul>
+
+<h2 class="section-heading">Packet-based round-robin</h2>
+
+<p>
+The packet arbiter keeps three main pieces of registered state:
+</p>
+
+<ul>
+  <li><code>sel</code>: the currently selected source</li>
+  <li><code>locked</code>: whether a transfer is in progress</li>
+  <li><code>rr_ptr</code>: the starting point for the next arbitration scan</li>
+</ul>
+
+<p>
+The combinational block scans the sources starting at <code>rr_ptr</code>, picks the first valid eligible source, and immediately drives it to the output. There is no idle cycle between the moment a source becomes valid and the moment its first beat appears at the output.
+</p>
+
+<p>
+The <code>locked</code> signal serves two distinct purposes, and understanding both is important for reading the RTL.
+</p>
+
+<p>
+<b>Purpose 1 — stabilize the selection while a beat is stalled.</b> The combinational scan runs every cycle. If the arbiter has chosen a source but <code>TREADY</code> is low, the scan would be free to switch to a different source on the next cycle. To prevent this, the sequential logic locks onto the chosen source as soon as a selection is made, even before any handshake occurs:
+</p>
+
+<pre><code>// No handshake yet: hold the chosen source stable
+if (!handshake) begin
+    sel    &lt;= arb_sel;
+    locked &lt;= 1'b1;
+end</code></pre>
+
+<p>
+<b>Purpose 2 — hold the grant through a multi-beat packet.</b> Once the first beat of a multi-beat packet is accepted, the arbiter stays locked until <code>TLAST</code> completes:
+</p>
+
+<pre><code>// First beat accepted, more beats remain: hold until TLAST
+else if (HOLD_PACKET &amp;&amp; !s_axis_tlast[arb_sel]) begin
+    sel    &lt;= arb_sel;
+    locked &lt;= 1'b1;
+end</code></pre>
+
+<p>
+If the very first beat of a packet also carries <code>TLAST</code> (a single-beat packet), neither lock path fires. The arbiter completes the unit immediately, advances <code>rr_ptr</code>, and is ready to arbitrate again the next cycle without ever setting <code>locked</code>.
+</p>
+
+<p>
+Only the selected source receives <code>TREADY</code>. All other inputs are held off regardless of how long the sink stalls. The <code>TREADY</code> assignment uses a constant-index loop to keep the generated logic straightforward across simulators and synthesizers:
+</p>
+
+<pre><code>for (int i = 0; i &lt; NUM_SRCS; i++) begin
+    s_axis_tready[i] = (eff_valid &amp;&amp; (eff_sel == SEL_W'(i)))
+                      ? m_axis_tready : 1'b0;
+end</code></pre>
+
+<h2 class="section-heading">How <code>rr_ptr</code> works</h2>
+
+<p>
+The round-robin pointer determines where the next arbitration scan begins. Instead of always starting from source 0, the scan starts at <code>rr_ptr</code> and wraps around. If there are <code>N</code> sources, the candidate at scan position <code>i</code> is:
+</p>
+
+<pre><code>idx = (rr_ptr + i) mod N,  i = 0 ... N-1</code></pre>
+
+<p>
+For example, with <code>N = 4</code> and <code>rr_ptr = 2</code>, the scan order is:
+</p>
+
+<pre><code>2, 3, 0, 1</code></pre>
+
+<p>
+In the RTL this is implemented without a modulo operator to keep synthesis clean:
+</p>
+
+<pre><code>idx = int'(rr_ptr) + i;
+if (idx &gt;= NUM_SRCS) idx -= NUM_SRCS;</code></pre>
+
+<p>
+Once a packet (or beat) completes, the pointer advances to the source immediately after the winner:
+</p>
+
+<pre><code>rr_ptr &lt;= SEL_W'(int'(sel) == NUM_SRCS-1 ? 0 : int'(sel) + 1);</code></pre>
+
+<p>
+This ensures the source that just won is not the first candidate in the next scan, which is what gives the arbiter its fairness.
+</p>
+
+<h2 class="section-heading">Packet-mode example</h2>
+
+<p>
+Assume:
+</p>
+
+<ul>
+  <li><code>NUM_SRCS = 4</code>, initial <code>rr_ptr = 0</code>, all four sources valid</li>
+  <li>packet lengths: <code>src0 = 3</code>, <code>src1 = 2</code>, <code>src2 = 1</code>, <code>src3 = 4</code> beats</li>
+</ul>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Round</th><th><code>rr_ptr</code> before scan</th><th>Scan order</th><th>Winner</th><th>Packet length</th><th><code>rr_ptr</code> after completion</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>0</td><td>0,1,2,3</td><td>0</td><td>3</td><td>1</td></tr>
+    <tr><td>2</td><td>1</td><td>1,2,3,0</td><td>1</td><td>2</td><td>2</td></tr>
+    <tr><td>3</td><td>2</td><td>2,3,0,1</td><td>2</td><td>1</td><td>3</td></tr>
+    <tr><td>4</td><td>3</td><td>3,0,1,2</td><td>3</td><td>4</td><td>0</td></tr>
+  </tbody>
+</table>
+<p>Table (1): Packet-based round-robin example.</p>
+
+<p>
+Complete packets are forwarded one at a time. Each source gets its turn, and the next scan always starts after the previous winner.
+</p>
+
+<h2 class="section-heading">Beat-based round-robin</h2>
+
+<p>
+Beat mode is enabled by setting <code>HOLD_PACKET = 0</code>. No other change to the RTL is needed. The beat test instantiates the DUT as:
+</p>
+
+<pre><code>snix_axis_arbiter #(
+    .NUM_SRCS   (4),
+    .HOLD_PACKET(1'b0)   // beat mode
+) u_dut ( ... );</code></pre>
+
+<p>
+The entire behavioral difference between packet and beat mode reduces to two lines:
+</p>
+
+<pre><code>assign unit_last = HOLD_PACKET ? s_axis_tlast[eff_sel] : 1'b1;
+assign unit_done = handshake &amp;&amp; unit_last;</code></pre>
+
+<p>
+In packet mode, <code>unit_last</code> follows <code>TLAST</code>, so <code>unit_done</code> fires only on the final beat of a packet. In beat mode, <code>unit_last</code> is always <code>1</code>, so <code>unit_done</code> fires on every accepted beat and <code>rr_ptr</code> advances immediately. The rest of the state machine is identical.
+</p>
+
+<p>
+The same pre-handshake lock still applies. Beat mode does not mean "switch every cycle"; it means "switch after each accepted beat". While <code>TREADY</code> is low, the current source remains selected until the handshake completes.
+</p>
+
+<h2 class="section-heading">Beat-mode example</h2>
+
+<p>
+Using the same source lengths as before (src0=3, src1=2, src2=1, src3=4 beats), the accepted beats evolve as shown in Table (2). When a source is exhausted it drops <code>TVALID</code> and the scan skips it.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Accepted beat</th><th><code>rr_ptr</code> before scan</th><th>Winner</th><th>Remaining beats after transfer</th><th><code>rr_ptr</code> after beat</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>0</td><td>0</td><td>0</td><td><code>src0=2, src1=2, src2=1, src3=4</code></td><td>1</td></tr>
+    <tr><td>1</td><td>1</td><td>1</td><td><code>src0=2, src1=1, src2=1, src3=4</code></td><td>2</td></tr>
+    <tr><td>2</td><td>2</td><td>2</td><td><code>src0=2, src1=1, src2=0, src3=4</code></td><td>3</td></tr>
+    <tr><td>3</td><td>3</td><td>3</td><td><code>src0=2, src1=1, src2=0, src3=3</code></td><td>0</td></tr>
+    <tr><td>4</td><td>0</td><td>0</td><td><code>src0=1, src1=1, src2=0, src3=3</code></td><td>1</td></tr>
+    <tr><td>5</td><td>1</td><td>1</td><td><code>src0=1, src1=0, src2=0, src3=3</code></td><td>2</td></tr>
+    <tr><td>6</td><td>2</td><td>3</td><td><code>src0=1, src1=0, src2=0, src3=2</code></td><td>0</td></tr>
+    <tr><td>7</td><td>0</td><td>0</td><td><code>src0=0, src1=0, src2=0, src3=2</code></td><td>1</td></tr>
+    <tr><td>8</td><td>1</td><td>3</td><td><code>src0=0, src1=0, src2=0, src3=1</code></td><td>0</td></tr>
+    <tr><td>9</td><td>0</td><td>3</td><td><code>src0=0, src1=0, src2=0, src3=0</code></td><td>0</td></tr>
+  </tbody>
+</table>
+<p>Table (2): Beat-based arbitration example.</p>
+
+<p>
+The difference is clear: beat mode interleaves traffic whenever several sources remain active. At beat 6 the scan starts at <code>rr_ptr=2</code>, skips the exhausted src2, and picks src3. The sink sees beats from multiple packets in alternating order, which is only safe when each beat is independently meaningful.
+</p>
+
+<h2 class="section-heading">Weighted packet arbitration</h2>
+
+<p>
+Equal round-robin is fair, but sometimes one source should be serviced more often than others. A weighted arbiter solves this while still keeping packet boundaries intact.
+</p>
+
+<p>
+Each source gets a credit counter initialized from its configured weight. A source is eligible only when it is both valid and has nonzero credit. When a packet completes, that source's credit is decremented. Once all active credits reach zero, the arbiter reloads them from <code>WEIGHTS</code> and starts a new weighted round.
+</p>
+
+<p>
+Weights are packed into the parameter with source 0 in the least-significant bits:
+</p>
+
+<pre><code>// {W3, W2, W1, W0} = {1, 1, 2, 4} for a 4:2:1:1 ratio
+localparam logic [NUM_SRCS*WEIGHT_W-1:0] WEIGHTS = {4'd1, 4'd1, 4'd2, 4'd4};</code></pre>
+
+<p>
+Credits are initialized by a helper function that also handles the zero-weight default:
+</p>
+
+<pre><code>function logic [WEIGHT_W-1:0] cfg_weight(input int src_idx);
+    logic [WEIGHT_W-1:0] raw;
+    raw = WEIGHTS[src_idx*WEIGHT_W +: WEIGHT_W];
+    cfg_weight = (raw == '0) ? WEIGHT_W'(1) : raw;
+endfunction</code></pre>
+
+<p>
+A weight of zero is treated as one, not as "never scheduled". This means the default <code>WEIGHTS = '0</code> gives every source one credit per round — exactly equal round-robin — so no special case is needed for the unweighted instantiation.
+</p>
+
+<h2 class="section-heading">Weighted example</h2>
+
+<p>
+With weights <code>src0:src1:src2:src3 = 4:2:1:1</code>, initial credits <code>(4,2,1,1)</code>, all sources valid throughout:
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Grant</th><th><code>rr_ptr</code></th><th>Credits before</th><th>Winner</th><th>Credits after</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>0</td><td><code>(4,2,1,1)</code></td><td>0</td><td><code>(3,2,1,1)</code></td></tr>
+    <tr><td>2</td><td>1</td><td><code>(3,2,1,1)</code></td><td>1</td><td><code>(3,1,1,1)</code></td></tr>
+    <tr><td>3</td><td>2</td><td><code>(3,1,1,1)</code></td><td>2</td><td><code>(3,1,0,1)</code></td></tr>
+    <tr><td>4</td><td>3</td><td><code>(3,1,0,1)</code></td><td>3</td><td><code>(3,1,0,0)</code></td></tr>
+    <tr><td>5</td><td>0</td><td><code>(3,1,0,0)</code></td><td>0</td><td><code>(2,1,0,0)</code></td></tr>
+    <tr><td>6</td><td>1</td><td><code>(2,1,0,0)</code></td><td>1</td><td><code>(2,0,0,0)</code></td></tr>
+    <tr><td>7</td><td>2</td><td><code>(2,0,0,0)</code></td><td>0</td><td><code>(1,0,0,0)</code></td></tr>
+    <tr><td>8</td><td>1</td><td><code>(1,0,0,0)</code></td><td>0</td><td><code>(0,0,0,0)</code></td></tr>
+    <tr><td>&mdash;</td><td>&mdash;</td><td><code>all zero &rarr; reload</code></td><td>&mdash;</td><td><code>(4,2,1,1)</code></td></tr>
+  </tbody>
+</table>
+<p>Table (3): Weighted packet arbitration example.</p>
+
+<p>
+At grant 7, <code>rr_ptr = 2</code> and the scan order is 2, 3, 0, 1. Sources 2 and 3 have exhausted their credits, so src0 wins with its remaining credit of 2. At grant 8, only src0 still has credit and wins the final slot. After grant 8 all credits are zero: the arbiter detects that active sources exist but none have credit, reloads, and is immediately ready to start the next weighted round.
+</p>
+
+<p>
+Weights control how often a source may win per round; they do not affect packet boundaries. Each grant still forwards a complete packet before the next scan.
+</p>
+
+<h2 class="section-heading">How the RTL is organized</h2>
+
+<p>
+The implementation uses one <code>always_comb</code> block and one <code>always_ff</code> block. Keeping them separate makes the design easy to read: anything that affects registers is in the sequential block and nothing else is.
+</p>
+
+<p>
+The combinational block scans sources, picks <code>arb_sel</code>, drives the output mux, and computes <code>TREADY</code>. The effective selection is a two-way mux between the locked source and the current scan winner:
+</p>
+
+<pre><code>eff_sel   = locked ? sel : arb_sel;
+eff_valid = locked ? s_axis_tvalid[sel] : arb_valid;</code></pre>
+
+<p>
+The <code>unit_last</code> and <code>unit_done</code> signals unify packet and beat mode into a single state machine path so that the sequential block does not branch on <code>HOLD_PACKET</code>:
+</p>
+
+<pre><code>assign unit_last = HOLD_PACKET ? s_axis_tlast[eff_sel] : 1'b1;
+assign unit_done = handshake &amp;&amp; unit_last;</code></pre>
+
+<p>
+The sequential block then acts on <code>unit_done</code> to advance <code>rr_ptr</code> and decrement the credit. Changing <code>HOLD_PACKET</code> is the only modification needed to switch between modes.
+</p>
+
+<h2 class="section-heading">How the tests are built</h2>
+
+<p>
+Each test instantiates the same topology:
+</p>
+
+<ul>
+  <li>four AXI-Stream source BFMs, each driving an input register slice</li>
+  <li>the arbiter DUT receiving packed signal arrays from the register slices</li>
+  <li>an output register slice feeding a sink BFM</li>
+  <li>protocol checkers on all four source interfaces and on the output</li>
+</ul>
+
+<p>
+The register slices serve a practical purpose. They align BFM-driven signals to clock edges and eliminate direct combinational paths from the BFMs to the DUT, which prevents convergence issues in Verilator under backpressure. The arbitration algorithm does not require them; they are a testbench concern.
+</p>
+
+<p>
+Source and sink backpressure are controlled at runtime via plusargs so each test runs in both configurations without recompilation:
+</p>
+
+<pre><code>void'($value$plusargs("SRC_BP=%d",  src_bp_en));
+void'($value$plusargs("SINK_BP=%d", sink_bp_en));</code></pre>
+
+<p>
+When enabled, each BFM randomly withholds <code>TREADY</code> approximately 20% of the time.
+</p>
+
+<p>
+The packet test (<code>axis_arbiter</code>) runs in two phases. <b>Phase 1</b> is sequential: each source sends one packet alone with no competing traffic, confirming basic forwarding and that the arbiter does not corrupt or drop beats. <b>Phase 2</b> is concurrent: all four sources send three packets each simultaneously, exercising round-robin rotation and correct behavior under backpressure. The expected totals are hard-coded:
+</p>
+
+<pre><code>// Phase 1: 4+5+3+6 = 18 beats, 4 packets
+// Phase 2: 3*(4+5+3+6) = 54 beats, 12 packets
+if (beats_recv !== 72)
+    $error("[ARB] FAIL: expected 72 beats, got %0d", beats_recv);
+else if (pkts_recv !== 16)
+    $error("[ARB] FAIL: expected 16 packets, got %0d", pkts_recv);</code></pre>
+
+<p>
+The weighted test (<code>axis_arbiter_weighted</code>) sends exactly <code>W0+W1+W2+W3 = 8</code> packets concurrently and checks that each source's grant count matches its configured weight exactly:
+</p>
+
+<pre><code>else if (src_grants[0] !== W0)
+    $error("[WARB] FAIL: src0 grants expected %0d, got %0d", W0, src_grants[0]);</code></pre>
+
+<p>
+The beat test (<code>axis_arbiter_beat</code>) sends four equal 3-beat packets concurrently (12 beats total). When source backpressure is disabled, it checks that the accepted beat sequence follows strict round-robin ordering:
+</p>
+
+<pre><code>for (int i = 0; i &lt; TOTAL_BEATS; i++) begin
+    if (sel_hist[i] !== (i % NUM_SRCS))
+        $error("[BARB] FAIL: expected beat %0d from src%0d, got src%0d",
+               i, i % NUM_SRCS, sel_hist[i]);
+end</code></pre>
+
+<p>
+With equal packet lengths and no backpressure, the expected sequence is exactly <code>0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3</code>. The per-source beat counts are also checked for balance regardless of backpressure mode.
+</p>
+
+<h2 class="section-heading">A useful verification lesson</h2>
+
+<p>
+The beat test required a careful choice of observation point for its accepted-beat monitor, and the issue is worth explaining because it recurs in handshake verification.
+</p>
+
+<p>
+The arbiter's <code>eff_sel</code> is combinational: it resolves in the same cycle as the handshake. Naively, one might sample <code>eff_sel</code> at the posedge alongside the handshake signals. The problem is that in a Verilator simulation, the posedge triggers multiple update passes: registered state changes, combinational re-evaluation, and BFM ready toggling can all happen in the same delta-cycle group. In edge cases the monitor could read an <code>eff_sel</code> that has already been updated for the <em>next</em> arbitration cycle rather than the source that actually drove the accepted beat.
+</p>
+
+<p>
+The fix is to capture <code>eff_sel</code> at the <b>negedge</b> immediately before the posedge. At that point the registered state from the previous cycle is stable, no new handshakes are in flight, and <code>eff_sel</code> correctly reflects the source currently driving the bus:
+</p>
+
+<pre><code>forever begin
+    @(negedge clk);
+    beat_sel_pre = int'(u_dut.eff_sel); // stable: posedge not yet
+    @(posedge clk);
+    beat_sel_mon = beat_sel_pre;        // use the pre-edge value
+    if (arb_tvalid_w &amp;&amp; arb_tready_w) begin
+        sel_hist[beats_recv] = beat_sel_mon;
+        beats_recv++;
+    end
+end</code></pre>
+
+<p>
+This is a recurring pattern: the interesting signal (which source drove a beat) and the trigger that confirms it (the posedge handshake) are not the same event. Sampling the interesting signal at the negedge cleanly separates the two without needing any delta-cycle reasoning. The same technique applies to any combinational signal that you want to attribute to a specific clock edge.
+</p>
+
+<h2 class="section-heading">When to use each mode</h2>
+
+<p>
+Packet round-robin is the safest default when <code>TLAST</code> marks a real packet, frame, or line boundary.
+</p>
+
+<p>
+Beat round-robin is useful when beats are independent and finer bandwidth sharing matters more than packet integrity.
+</p>
+
+<p>
+Weighted packet arbitration is useful when some streams should receive more service than others without breaking packet boundaries.
+</p>
+
+<h2 class="section-heading">Where to go next</h2>
+
+<p>
+This arbiter is already a useful AXI-Stream primitive, but it also opens the door to several natural extensions:
+</p>
+
+<ul>
+  <li>weighted beat arbitration</li>
+  <li><code>TDEST</code>-qualified arbitration</li>
+  <li>destination-based routing</li>
+  <li>full AXI-Stream switches</li>
+  <li>AXI memory-mapped arbiters for shared DMA and CDMA access</li>
+</ul>
+
+<p>
+Even in its current form it is a good example of how a small RTL block becomes much more useful once the policy is explicit and the tests clearly prove the intended behavior.
+</p>
+
+<h2 class="section-heading">Related</h2>
+
+<ul>
+  <li><a href="https://github.com/nelsoncsc/verilaxi/blob/main/rtl/axis/snix_axis_arbiter.sv">Read the RTL in verilaxi</a></li>
+  <li><a href="axi_sva.html">Related: SVA protocol checkers for AXI</a></li>
+  <li><a href="axi_vip.html">Related: Building SystemVerilog AXI VIP for Fast Bring-Up</a></li>
+  <li><a href="fifo_cdc.html">Related: FIFOs and CDC in SystemVerilog</a></li>
+</ul>
+
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson.csc@outlook.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://www.linkedin.com/in/nelson-campos-9a4093128/">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-linkedin fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; Nelson Campos 2016 - 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/jquery.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/clean-blog.min.js"></script>
+
+</body>
+
+</html>
