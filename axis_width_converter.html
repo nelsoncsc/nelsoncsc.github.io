@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - AXI-Stream width converters in SystemVerilog">
+    <meta name="keywords" content="hardware, AXI-Stream, AXIS, width converter, upsizer, downsizer, TKEEP, TLAST, DMA, video, CNN, Ethernet, SystemVerilog, Verilator, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>Building AXI-Stream Width Converters</title>
+
+    <link rel="canonical" href="https://sistenix.com/axis_width_converter.html">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="index.html">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>Building AXI-Stream Width Converters</h1>
+                        <h2 class="subheading">Upsizing, downsizing, and byte-accurate repacking for real datapaths</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 23, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+
+<p>
+Real datapaths rarely use a single stream width end to end. A DMA path may prefer wide words for memory efficiency, while the producer emits bytes or halfwords. A video stage may process one or two pixels at a time, then write results through a wider stream. A CNN accelerator may consume vectors chosen for the MAC array width, while feature maps arrive in a different packing. Ethernet and packet pipelines face the same problem: parser, buffer, and MAC stages do not always want the same bus width. Width converters are the glue that makes these stages connect cleanly without forcing every block to adopt the same datapath.
+</p>
+
+<p>
+In <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>, AXI-Stream width conversion is implemented in three related forms:
+</p>
+
+<ul>
+  <li>integer upsizing, where several narrow beats are packed into one wider beat</li>
+  <li>integer downsizing, where one wide beat is emitted as several narrower beats</li>
+  <li>rational byte repacking, where the input and output widths are byte-aligned but not integer multiples of each other</li>
+</ul>
+
+<p>
+The first two are conceptually simple pack and unpack operations. The third is more interesting, because once the ratio is rational the converter must preserve a rolling byte stream rather than simply regrouping whole beats.
+</p>
+
+<p>
+Figure (1) shows the rational-ratio wrappers used in <code>verilaxi</code>. The top path upsizes from a narrower input to a wider output, while the bottom path downsizes from a wider input to a narrower output. The same byte-preserving repacking idea sits behind the more general rational converter.
+</p>
+
+<a href="img/verilaxi/axi_rr_up_down_sizer.svg"><img src="img/verilaxi/axi_rr_up_down_sizer.svg" class="img-responsive center-block" alt="Rational-ratio AXI-Stream width-converter wrappers"></a>
+<p>Figure (1): Rational-ratio AXI-Stream width-converter wrappers in <code>verilaxi</code>. The top path is <code>snix_axis_rr_upsizer</code> (narrow to wide) and the bottom path is <code>snix_axis_rr_downsizer</code> (wide to narrow).</p>
+
+<h2 class="section-heading">Why width conversion matters</h2>
+
+<p>
+Width conversion appears whenever one stage is optimized for memory bandwidth and another is optimized for compute granularity. That is common in high-throughput systems.
+</p>
+
+<ul>
+  <li><b>DMA:</b> a memory-facing path often wants <code>64-bit</code> or <code>128-bit</code> transfers, while the source or sink may naturally produce <code>8-bit</code> or <code>16-bit</code> samples.</li>
+  <li><b>Video processing:</b> a pixel block may work on one component or one pixel per cycle, then feed a wider writer or crossbar.</li>
+  <li><b>CNN accelerators:</b> feature maps and weights may be streamed in one width while compute tiles consume packed vectors in another.</li>
+  <li><b>Ethernet and packet paths:</b> packet buffering, parsing, and framing logic often operate at different convenient widths.</li>
+</ul>
+
+<p>
+A useful design library therefore needs more than sources, sinks, FIFOs, and arbiters. It also needs the blocks that let mismatched widths connect without losing byte order, <code>TKEEP</code> validity, or packet boundaries.
+</p>
+
+<h2 class="section-heading">Which converter to choose</h2>
+
+<p>
+The module choice depends on the ratio between the input and output widths.
+</p>
+
+<ul>
+  <li>Use <code>snix_axis_upsizer</code> when <code>OUT = N × IN</code> for an integer narrow-to-wide conversion.</li>
+  <li>Use <code>snix_axis_downsizer</code> when <code>IN = N × OUT</code> for an integer wide-to-narrow conversion.</li>
+  <li>Use <code>snix_axis_rr_upsizer</code> when the ratio is rational and <code>OUT &gt; IN</code>.</li>
+  <li>Use <code>snix_axis_rr_downsizer</code> when the ratio is rational and <code>IN &gt; OUT</code>.</li>
+  <li>Use <code>snix_axis_rr_converter</code> when the direction is not fixed or when a generic byte-aligned rational converter is more convenient.</li>
+</ul>
+
+<p>
+The numerical examples below illustrate all three cases: integer upsizing, integer downsizing, and rational byte repacking.
+</p>
+
+<h2 class="section-heading">Three kinds of converter</h2>
+
+<p>
+The easiest case is integer upsizing. If the input is <code>8-bit</code> and the output is <code>32-bit</code>, the converter simply collects four input bytes and emits one output beat. Integer downsizing is the reverse: a <code>32-bit</code> input beat is accepted once, then drained as four <code>8-bit</code> output beats.
+</p>
+
+<p>
+Rational conversion is different. A <code>16-bit</code> to <code>24-bit</code> converter cannot reset neatly after every beat, because two input beats produce four bytes, which correspond to one full <code>24-bit</code> output beat plus one leftover byte. That leftover byte must be carried into the next cycle and combined with future input data. The mirrored downsize case, <code>24-bit</code> to <code>16-bit</code>, has the same alignment window but drains it in the opposite direction. This turns the problem into byte-stream repacking rather than simple beat regrouping.
+</p>
+
+<h2 class="section-heading">Upsizing example: <code>8 -&gt; 32</code></h2>
+
+<p>
+Assume the input produces one valid byte per beat and the converter emits a <code>32-bit</code> output word. The converter accumulates four bytes before asserting the output handshake, unless the packet ends early.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Input beat</th><th>Valid byte</th><th>Buffer after beat</th><th>Output</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>0</td><td><code>B0</code></td><td><code>[B0]</code></td><td>none</td></tr>
+    <tr><td>1</td><td><code>B1</code></td><td><code>[B0 B1]</code></td><td>none</td></tr>
+    <tr><td>2</td><td><code>B2</code></td><td><code>[B0 B1 B2]</code></td><td>none</td></tr>
+    <tr><td>3</td><td><code>B3</code></td><td><code>[B0 B1 B2 B3]</code></td><td><code>[B3 B2 B1 B0]</code>, <code>TKEEP=1111</code></td></tr>
+  </tbody>
+</table>
+<p>Table (1): Integer upsizing from <code>8-bit</code> to <code>32-bit</code></p>
+
+<p>
+If the packet ends after only three bytes, the converter still emits one final <code>32-bit</code> beat, but now <code>TKEEP</code> marks only the valid lanes. In that case the packed output contains three bytes and <code>TKEEP=0111</code> for the final beat. The exact bit ordering depends on the chosen byte-lane convention, but the important point is that the converter emits a partial last word without losing packet termination.
+</p>
+
+<h2 class="section-heading">Downsizing example: <code>32 -&gt; 8</code></h2>
+
+<p>
+Downsizing accepts one wide beat, stores it internally, and then drains it one smaller slice at a time. The input handshake happens once, but the output handshake happens once per emitted slice.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Output beat</th><th>Source bytes remaining</th><th>Emitted byte</th><th><code>TLAST</code></th></tr>
+  </thead>
+  <tbody>
+    <tr><td>0</td><td><code>[B0 B1 B2 B3]</code></td><td><code>B0</code></td><td>0</td></tr>
+    <tr><td>1</td><td><code>[B1 B2 B3]</code></td><td><code>B1</code></td><td>0</td></tr>
+    <tr><td>2</td><td><code>[B2 B3]</code></td><td><code>B2</code></td><td>0</td></tr>
+    <tr><td>3</td><td><code>[B3]</code></td><td><code>B3</code></td><td>1 if final byte of packet</td></tr>
+  </tbody>
+</table>
+<p>Table (2): Integer downsizing from <code>32-bit</code> to <code>8-bit</code></p>
+
+<p>
+This is exactly the kind of conversion that appears when a DMA read path returns wide memory words but the downstream logic consumes a byte stream or a narrow sample stream.
+</p>
+
+<h2 class="section-heading">Rational example: <code>16 -&gt; 24</code></h2>
+
+<p>
+The rational case is where width conversion becomes more interesting. A <code>16-bit</code> input beat contributes two bytes, while a <code>24-bit</code> output beat consumes three bytes. The converter therefore needs a byte reservoir that persists across handshakes.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Step</th><th>Action</th><th>Reservoir contents</th><th>Output</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>accept <code>[B1 B0]</code></td><td><code>[B0 B1]</code></td><td>none</td></tr>
+    <tr><td>2</td><td>accept <code>[B3 B2]</code></td><td><code>[B0 B1 B2 B3]</code></td><td><code>[B2 B1 B0]</code>, <code>TKEEP=111</code></td></tr>
+    <tr><td>3</td><td>after emit</td><td><code>[B3]</code></td><td>none</td></tr>
+    <tr><td>4</td><td>accept <code>[B5 B4]</code></td><td><code>[B3 B4 B5]</code></td><td><code>[B5 B4 B3]</code>, <code>TKEEP=111</code></td></tr>
+  </tbody>
+</table>
+<p>Table (3): Rational conversion from <code>16-bit</code> to <code>24-bit</code></p>
+
+<p>
+The important point is that the byte stream remains ordered even though the beat boundaries do not line up. This is why rational conversion is better described as byte repacking than as simple upsizing or downsizing.
+</p>
+
+<h2 class="section-heading">Example beat traces</h2>
+
+<p>
+It is often easier to understand width conversion by looking at accepted input beats and emitted output beats side by side. The <code>verilaxi</code> tests now log both directions explicitly, which makes the grouping and draining behavior much easier to follow.
+</p>
+
+<p>
+For an <code>8 -&gt; 32</code> upsizer, a short packet trace looks like:
+</p>
+
+<pre><code>[UPS][IN ] beat 0/3 tdata=0x01 tkeep=1 tlast=0
+[UPS][IN ] beat 1/3 tdata=0x02 tkeep=1 tlast=0
+[UPS][IN ] beat 2/3 tdata=0x03 tkeep=1 tlast=0
+[UPS][IN ] beat 3/3 tdata=0x04 tkeep=1 tlast=1
+[UPS][OUT] beat 0 tdata=0x04030201 tkeep=1111 tlast=1</code></pre>
+
+<p>
+For a <code>32 -&gt; 8</code> downsizer, the pattern is reversed: one input beat is followed by several output beats:
+</p>
+
+<pre><code>[DNS][IN ] beat 0/0 tdata=0x04030201 tkeep=1111 tlast=1
+[DNS][OUT] beat 0 tdata=0x01 tkeep=1 tlast=0
+[DNS][OUT] beat 1 tdata=0x02 tkeep=1 tlast=0
+[DNS][OUT] beat 2 tdata=0x03 tkeep=1 tlast=0
+[DNS][OUT] beat 3 tdata=0x04 tkeep=1 tlast=1</code></pre>
+
+<p>
+For the rational <code>16 -&gt; 24</code> case, the key observation is that the output beats no longer line up one-for-one with the input beats:
+</p>
+
+<pre><code>[RRC][IN ] beat 0/2 tdata=0x0201 tkeep=11 tlast=0
+[RRC][IN ] beat 1/2 tdata=0x0403 tkeep=11 tlast=0
+[RRC][OUT] beat 0 tdata=0x030201 tkeep=111 tlast=0
+[RRC][IN ] beat 2/2 tdata=0x0605 tkeep=11 tlast=1
+[RRC][OUT] beat 1 tdata=0x060504 tkeep=111 tlast=1</code></pre>
+
+<p>
+These traces make the main difference between the three converter families visible immediately: integer upsizers collect, integer downsizers drain, and rational converters carry partial byte progress across beat boundaries.
+</p>
+
+<h2 class="section-heading">Implementation details</h2>
+
+<p>
+The integer converters are straightforward. The upsizer keeps a phase counter and a small bank of partial words, then emits once the output word is full or the packet ends. The downsizer accepts one input word into a holding register, then drains it slice by slice until the last valid output beat has been emitted.
+</p>
+
+<p>
+The rational converter is where the implementation gets more interesting. A useful way to reason about it is through the greatest common divisor and least common multiple of the two widths. If the input width is <code>IN</code> and the output width is <code>OUT</code>, then one natural conversion window is:
+</p>
+
+<pre><code>LCM(IN, OUT)</code></pre>
+
+<p>
+Within that window, a fixed number of input beats maps to a fixed number of output beats. For example, with <code>16 -&gt; 24</code>:
+</p>
+
+<ul>
+  <li><code>GCD(16, 24) = 8</code></li>
+  <li><code>LCM(16, 24) = 48</code></li>
+  <li><code>48 / 16 = 3</code> input beats per conversion window</li>
+  <li><code>48 / 24 = 2</code> output beats per conversion window</li>
+</ul>
+
+<p>
+This LCM view is useful because it tells us the repeating structure of the conversion. Three <code>16-bit</code> beats carry the same total number of bits as two <code>24-bit</code> beats. In a naive implementation, that suggests buffering one full LCM-sized window and then draining it.
+</p>
+
+<p>
+That idea is correct, but a practical AXI-Stream converter must also cope with partial packets and sparse <code>TKEEP</code>. Once arbitrary byte validity is allowed, the implementation has to preserve a byte stream rather than simply reshuffling fixed bit fields. That is why the <code>verilaxi</code> rational converter is structured as a byte reservoir: valid input bytes are appended in order, and output bytes are drained in order once enough bytes exist for an output beat or the packet ends.
+</p>
+
+<p>
+Another important detail is <b>when</b> this arithmetic is done. The converter does not divide widths at runtime in hardware. Instead, the <code>GCD</code>, <code>LCM</code>, and the repeating input/output ratios are resolved at <b>elaboration time</b>, when the parameterized module instance is turned into a concrete design. For a specific instance such as <code>IN=16</code>, <code>OUT=24</code>, the tool can determine once and for all that the repeating relationship is <code>3</code> input beats to <code>2</code> output beats.
+</p>
+
+<p>
+That distinction matters because elaboration-time arithmetic becomes constants in the generated RTL, while runtime arithmetic becomes real hardware. If the converter tried to compute divide or modulo relationships dynamically in the datapath, synthesis would produce much larger and slower logic than needed. By deriving the ratio structure up front, the generated hardware can stay small and regular: counters, byte counts, comparators, and muxes instead of generic divider logic.
+</p>
+
+<h2 class="section-heading">The LCM rule and why it matters</h2>
+
+<p>
+The LCM rule is not just a mathematical curiosity. It tells us the smallest width window where the two interfaces align exactly. That helps in two ways:
+</p>
+
+<ul>
+  <li>it defines the repeating ratio between input and output beats</li>
+  <li>it gives a natural upper bound for the amount of buffering needed by a grouped conversion scheme</li>
+</ul>
+
+<p>
+For the mirrored rational downsize case, consider <code>24 -&gt; 16</code>:
+</p>
+
+<ul>
+  <li><code>GCD(24, 16) = 8</code></li>
+  <li><code>LCM(24, 16) = 48</code></li>
+  <li><code>48 / 24 = 2</code> input beats</li>
+  <li><code>48 / 16 = 3</code> output beats</li>
+</ul>
+
+<p>
+So one full <code>48-bit</code> conversion window can be viewed in two mirrored ways:
+</p>
+
+<ul>
+  <li><code>16 -&gt; 24</code>: three input beats become two output beats</li>
+  <li><code>24 -&gt; 16</code>: two input beats become three output beats</li>
+</ul>
+
+<p>
+The reservoir implementation does not need to think in rigid windows at runtime, but this arithmetic still explains the shape of the datapath and why the converter naturally needs storage larger than either interface width alone.
+</p>
+
+<p>
+This also explains why integer conversion is simpler. If one width is an exact multiple of the other, the LCM collapses to the wider width, so the converter only needs a straightforward pack or unpack schedule. Rational conversion is harder precisely because the alignment window is larger than both interface widths, which forces the design to carry partial progress across beats.
+</p>
+
+<h2 class="section-heading">Synthesis-aware implementation choices</h2>
+
+<p>
+One lesson from building these converters in SystemVerilog is that mathematically simple expressions are not always synthesis-friendly if they are left for hardware to compute dynamically. A direct divider or modulo operation in the active datapath can blow up logic area quickly, especially in generic parameterized modules.
+</p>
+
+<p>
+For that reason, the converter family in <code>verilaxi</code> leans on elaboration-time arithmetic and simple counters wherever possible:
+</p>
+
+<ul>
+  <li>integer converters compute their ratio as a localparam and use phase counters instead of dynamic arithmetic</li>
+  <li>the rational converter derives <code>GCD</code> and the effective conversion ratios at elaboration time</li>
+  <li><code>TKEEP</code> and packet-end behaviour are driven by byte counts and compact masks rather than synthesized divide/modulo datapaths in the hot path</li>
+</ul>
+
+<p>
+This is partly a performance choice and partly a portability choice. Keeping the arithmetic simple helps both timing closure and tool behavior across Verilator and Yosys.
+</p>
+
+<p>
+There is also a structural optimization here. The integer converters can often overlap input acceptance and output consumption because their control is just a small counter and a holding register. Rational conversion is inherently more stateful, since byte alignment does not reset every beat. Even so, implementing it as a byte reservoir keeps the core logic regular: append valid bytes, track how many are buffered, emit when enough bytes exist, and generate <code>TKEEP</code> from the actual valid-byte count.
+</p>
+
+<p>
+The practical takeaway is that the mathematical view and the hardware view are both useful, but for different reasons. The <code>GCD/LCM</code> arithmetic explains the repeating relationship between widths. The actual RTL should then turn that relationship into constant parameters, small counters, and simple control decisions. That is the point of the elaboration-time approach: use the math to shape the circuit, not to burden the circuit with unnecessary arithmetic hardware.
+</p>
+
+<h2 class="section-heading"><code>TKEEP</code> turns this into a byte problem</h2>
+
+<p>
+AXI-Stream width conversion becomes much more subtle once <code>TKEEP</code> is allowed to be sparse. If every beat is full except for the final packet beat, an integer converter can often be understood as a simple counter plus a shifter. Once <code>TKEEP</code> can mark arbitrary subsets of valid bytes, the converter must compact and preserve only the valid bytes.
+</p>
+
+<p>
+That means the converter is no longer just moving words between widths. It is transforming a byte stream with explicit validity information. In other words, width conversion stops being just a beat regrouping problem and becomes a byte-stream repacking problem.
+</p>
+
+<p>
+This matters in practice. A DMA path may end on a partial memory word. A packet path may strip or append headers and emit short fragments. A video or CNN block may generate trailing partial groups when frame sizes are not aligned to the preferred vector width. If the converter gets <code>TKEEP</code> wrong, the packet length can still look correct while the payload is corrupted byte by byte.
+</p>
+
+<h2 class="section-heading">How the RTL is structured</h2>
+
+<p>
+The integer upsizer and downsizer in <code>verilaxi</code> use parameterized integer ratios and are straightforward to reason about. The rational converter uses a byte reservoir. Valid input bytes are appended in order, and output bytes are drained in order once enough data is available for an output beat or once the packet ends.
+</p>
+
+<p>
+This structure is a good fit for arbitrary byte-aligned ratios because it avoids forcing the logic into special-case pack/unpack rules for each width pair. Instead, the converter operates on a common internal idea: accepted valid bytes go into the reservoir, emitted bytes come out of it, and <code>TKEEP</code> follows the number of valid bytes available on each output beat.
+</p>
+
+<h2 class="section-heading">How the tests prove it</h2>
+
+<p>
+A width converter can appear correct if you only count beats and packets. That is not enough. The core verification problem is byte ordering and byte validity.
+</p>
+
+<p>
+The converter tests in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a> therefore use byte-accurate scoreboards. Instead of checking only packet counts or final <code>TLAST</code>, the testbench builds an expected byte queue, consumes emitted bytes one beat at a time, and checks:</p>
+
+<ul>
+  <li><code>TDATA</code> lane contents</li>
+  <li><code>TKEEP</code> mask values</li>
+  <li><code>TLAST</code> position</li>
+  <li>final byte and packet counts</li>
+</ul>
+
+<p>
+This is especially important for the rational converter, where a design can easily preserve the right number of bytes while still mis-ordering lanes or marking stale bytes as valid.
+</p>
+
+<h2 class="section-heading">Where these blocks fit</h2>
+
+<p>
+Width converters are not glamorous IP blocks, but they are essential datapath glue. They show up wherever systems try to combine bandwidth efficiency, compute efficiency, and protocol cleanliness in the same design.
+</p>
+
+<ul>
+  <li>A streaming DMA may upsizer sensor or packet data into wider memory-facing words.</li>
+  <li>A DMA read path may downsizer memory words into narrower processing streams.</li>
+  <li>A video chain may move between per-pixel and multi-pixel packing.</li>
+  <li>A CNN accelerator may bridge scalar feature-map streams and vectorized compute lanes.</li>
+  <li>An Ethernet path may connect packet buffers, parsers, and MAC-adjacent logic that naturally prefer different widths.</li>
+</ul>
+
+<p>
+Once a library has these blocks alongside FIFOs, arbiters, DMA engines, and assertions, it becomes much more useful as a system-building toolkit rather than just a collection of isolated IPs.
+</p>
+
+<h2 class="section-heading">Closing remarks</h2>
+
+<p>
+AXI-Stream width converters are easy to underestimate. The integer cases are simple enough that they can look like a minor utility block, and the rational case looks at first like only a more general version of the same thing. In practice they sit directly on the path between real producers and consumers, and small mistakes in byte ordering or validity handling turn into silent payload corruption.
+</p>
+
+<p>
+That is why the most important ideas in these converters are not only the data-path structures themselves, but also the insistence on byte-accurate verification. Once the tests prove that bytes, <code>TKEEP</code>, and packet boundaries survive width changes correctly, these blocks become dependable building blocks for DMA, video, CNN, and packet-processing systems.
+</p>
+
+<hr>
+
+<p>
+Related posts:
+</p>
+
+<ul>
+  <li><a href="axi_dma.html">AXI DMA - Moving Data Without the CPU</a></li>
+  <li><a href="axi_arbiter.html">AXI-Stream Arbitration in SystemVerilog</a></li>
+  <li><a href="fifo_cdc.html">Asynchronous FIFO for CDC</a></li>
+</ul>
+
+<p>
+Repository:
+<a href="https://github.com/nelsoncsc/verilaxi">github.com/nelsoncsc/verilaxi</a>
+</p>
+
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelsonca@outlook.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; Nelson Campos 2016 - 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/jquery.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/clean-blog.min.js"></script>
+
+</body>
+
+</html>
