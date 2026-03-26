@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sistenix.com/sitemap.xml

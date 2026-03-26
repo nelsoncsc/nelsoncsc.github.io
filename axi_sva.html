@@ -52,13 +52,13 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a class="navbar-brand" href="index.html">Nelson Campos</a>
+                <a class="navbar-brand" href="/">Nelson Campos</a>
             </div>
 
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
                                 <ul class="nav navbar-nav navbar-right">
                     <li>
-                        <a href="index.html">Home</a>
+                        <a href="/">Home</a>
                     </li>
                     <li>
                         <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
@@ -246,6 +246,10 @@ Verilaxi includes four SVA checker modules, each focused on a specific aspect of
 Each checker is a standalone module instantiated inside the test, alongside the DUT. It receives the same interface signals and runs continuously throughout the simulation. A failing assertion stops the simulation immediately and reports the time, hierarchy path, and property name.
 </p>
 
+<p>
+These checkers are designed to sit next to the task-based drivers described in <a href="axi_vip.html">Building SystemVerilog AXI VIP for Fast Bring-Up</a>. The VIP generates realistic AXI traffic; the SVA modules continuously verify that the traffic obeys the protocol. Together they form a lightweight verification stack: procedural stimulus on one side, protocol rules on the other.
+</p>
+
 <h2 class="section-heading">VALID stability</h2>
 
 <p>
@@ -389,6 +393,7 @@ SVA protocol checkers are a lightweight and highly effective addition to any AXI
 <p>
 Read next:<br>
 <a href="axi_vip.html">Building SystemVerilog AXI VIP for Fast Bring-Up</a> for the task-based environment that these assertions watch.<br>
+<a href="axi_csr.html">Writing a CSR Block Using AXI-Lite</a> for a simple register interface where AXI-Lite VALID and payload checks are immediately useful.<br>
 <a href="axi_dma.html">AXI DMA — Moving Data Without the CPU</a> for a concrete example where WLAST and 4KB checks matter in practice.<br>
 Implementation pointers in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>: <code>tb/assertions/axis_checker.sv</code>, <code>tb/assertions/axil_checker.sv</code>, <code>tb/assertions/axi_mm_checker.sv</code>, and <code>tb/assertions/axi_4k_checker.sv</code>.
 </p>
