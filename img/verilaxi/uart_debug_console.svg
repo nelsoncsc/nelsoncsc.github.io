@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="380" viewBox="0 0 1140 380">
+  <defs>
+    <style>
+      .title { font: 700 28px 'Helvetica Neue', Arial, sans-serif; fill: #1f2937; }
+      .label { font: 600 18px 'Helvetica Neue', Arial, sans-serif; fill: #111827; }
+      .body { font: 400 16px 'Helvetica Neue', Arial, sans-serif; fill: #374151; }
+      .small { font: 400 14px 'Helvetica Neue', Arial, sans-serif; fill: #4b5563; }
+      .wire { stroke: #334155; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .box { stroke: #1f2937; stroke-width: 2.5; rx: 18; ry: 18; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+  </defs>
+
+  <rect width="1140" height="380" fill="#ffffff"/>
+  <text x="40" y="42" class="title">CPU-less AXI-Lite debug console stack</text>
+
+  <rect x="40" y="90" width="270" height="110" class="box" fill="#dbeafe"/>
+  <text x="175" y="122" text-anchor="middle" class="label">uart_cmd.py</text>
+  <text x="175" y="144" text-anchor="middle" class="label">host script</text>
+  <text x="175" y="166" text-anchor="middle" class="body">raw termios serial link</text>
+  <text x="175" y="188" text-anchor="middle" class="body">ASCII command transport</text>
+
+  <rect x="350" y="50" width="300" height="210" class="box" fill="#ede9fe"/>
+  <text x="500" y="92" text-anchor="middle" class="label">snix_uart_axil_master</text>
+  <rect x="380" y="114" width="108" height="84" class="box" fill="#ddd6fe"/>
+  <text x="434" y="146" text-anchor="middle" class="body">Parse FSM</text>
+  <text x="434" y="174" text-anchor="middle" class="small">W/R + hex fields</text>
+  <rect x="512" y="114" width="108" height="84" class="box" fill="#ddd6fe"/>
+  <text x="566" y="146" text-anchor="middle" class="body">AXI FSM</text>
+  <text x="566" y="174" text-anchor="middle" class="small">AW/W/B, AR/R</text>
+  <text x="500" y="222" text-anchor="middle" class="small">One command -> one AXI transaction</text>
+  <text x="500" y="242" text-anchor="middle" class="small">-> one response</text>
+
+  <rect x="710" y="90" width="270" height="110" class="box" fill="#dcfce7"/>
+  <text x="845" y="124" text-anchor="middle" class="label">AXI-Lite fabric</text>
+  <text x="845" y="150" text-anchor="middle" class="body">GPIO, UART peripheral, DMA CSR</text>
+  <text x="845" y="176" text-anchor="middle" class="body">board bring-up targets</text>
+
+  <path d="M310 145 H350" class="wire"/>
+  <path d="M650 145 H710" class="wire"/>
+
+  <text x="175" y="305" text-anchor="middle" class="small">Host side</text>
+  <text x="500" y="305" text-anchor="middle" class="small">On-FPGA parser and AXI bridge</text>
+  <text x="845" y="305" text-anchor="middle" class="small">Peripherals under test</text>
+</svg>

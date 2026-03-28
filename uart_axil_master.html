@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - A CPU-less AXI-Lite debug console with UART parsing and GPIO bring-up">
+    <meta name="keywords" content="UART, AXI-Lite, master, bridge, parser, GPIO, debounce, edge capture, W1C, SystemVerilog, board bring-up, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>A CPU-less AXI-Lite Debug Console: Parser and GPIO Bring-up</title>
+
+    <link rel="canonical" href="https://sistenix.com/uart_axil_master.html">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="/">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="/">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>A CPU-less AXI-Lite Debug Console: Parser and GPIO Bring-up</h1>
+                        <h2 class="subheading">ASCII commands over a serial cable drive AXI-Lite registers without a CPU and bring up the first real peripheral on the bus</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 26, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+
+<h2 class="section-heading">Motivation</h2>
+
+<p>
+Most FPGA bring-up and debug flows assume the presence of a CPU to issue bus transactions. A processor reads a status register, writes a configuration word, or polls a done flag. Without a processor, the standard approach is to add a JTAG-to-AXI bridge or wait until enough of the system is working to run software. That is often too late.
+</p>
+
+<p>
+<code>snix_uart_axil_master</code> eliminates that dependency. Any host with a serial port &mdash; a laptop running a two-line Python script, a Raspberry Pi, a test bench &mdash; can read and write any AXI-Lite register in the FPGA using simple ASCII commands over a serial cable. No processor is required inside the FPGA fabric.
+</p>
+
+<p>
+The practical impact is significant. Without a processor you can still configure DMA descriptors, read status registers, toggle LEDs, verify peripheral behaviour, and bring up new blocks one register at a time. Before the application processor is up, before the Linux image boots, and even before the SoC clocks are stable, the UART master is already running and accepting commands. The byte transport layer is provided by <a href="uart_lite.html"><code>snix_uart_lite</code></a>, which handles 8N1 framing, baud-rate generation, and shallow TX/RX FIFOs. This module sits on top of that transport and interprets the byte stream as a command protocol.
+</p>
+
+<h2 class="section-heading">Command protocol</h2>
+
+<p>
+The protocol is intentionally ASCII and human-readable. Commands are terminated with a newline character (<code>\n</code>). Whitespace between fields is tolerated. Hex digits may be upper or lower case.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Command format</th>
+      <th>Example</th>
+      <th>Response format</th>
+      <th>Example response</th>
+      <th>AXI transaction</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>W &lt;addr32hex&gt; &lt;data32hex&gt;\n</code></td>
+      <td><code>W 00000010 DEADBEEF\n</code></td>
+      <td><code>OK\n</code></td>
+      <td><code>OK\n</code></td>
+      <td>AXI-Lite write: AW + W + B channels</td>
+    </tr>
+    <tr>
+      <td><code>R &lt;addr32hex&gt;\n</code></td>
+      <td><code>R 00000010\n</code></td>
+      <td><code>D &lt;addr32hex&gt; &lt;data32hex&gt;\n</code></td>
+      <td><code>D 00000010 DEADBEEF\n</code></td>
+      <td>AXI-Lite read: AR + R channels</td>
+    </tr>
+    <tr>
+      <td>Any unrecognised command</td>
+      <td><code>X 00000000\n</code></td>
+      <td><code>ERR\n</code></td>
+      <td><code>ERR\n</code></td>
+      <td>None &mdash; parse error, no AXI transaction issued</td>
+    </tr>
+  </tbody>
+</table>
+<p>Table (1): Command protocol summary. Address and data fields are always 8 hex digits (32 bits). The response to a read echoes both the address and the data to make log files self-documenting.</p>
+
+<h2 class="section-heading">How the UART syntax parser works</h2>
+
+<p>
+The parser is intentionally small. It only understands two commands:
+</p>
+
+<ul>
+  <li><code>W &lt;addr&gt; &lt;data&gt;\n</code> for writes</li>
+  <li><code>R &lt;addr&gt;\n</code> for reads</li>
+</ul>
+
+<p>
+Internally it behaves like a compact command decoder rather than a shell. It consumes one byte at a time, classifies the current field, and shifts each hex nibble into either <code>cmd_addr</code> or <code>cmd_data</code>. Once it has seen eight address nibbles it knows exactly whether the next field must be data (write) or a newline (read).
+</p>
+
+<p>
+The table below traces the write command <code>W 00000010 DEADBEEF\n</code> character by character. The parser accumulates hex nibbles into <code>cmd_addr</code> and <code>cmd_data</code> using shift-in semantics: on each valid hex digit, the register is shifted left by four bits and the new nibble is inserted at the bottom.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Character</th>
+      <th>ASCII hex</th>
+      <th>Parser state (before)</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><code>W</code></td><td><code>0x57</code></td><td><code>PARSE_IDLE</code></td><td>Set <code>cmd_is_write=1</code>, clear <code>cmd_addr</code>, <code>nibble_count=0</code>, transition to <code>PARSE_ADDR</code></td></tr>
+    <tr><td><code> </code></td><td><code>0x20</code></td><td><code>PARSE_ADDR</code></td><td>Leading space &mdash; stay in <code>PARSE_ADDR</code> (whitespace skip)</td></tr>
+    <tr><td><code>0</code></td><td><code>0x30</code></td><td><code>PARSE_ADDR</code></td><td><code>cmd_addr = {cmd_addr[27:0], 4'h0}</code>, <code>nibble_count=1</code></td></tr>
+    <tr><td><code>0</code></td><td><code>0x30</code></td><td><code>PARSE_ADDR</code></td><td><code>cmd_addr = {cmd_addr[27:0], 4'h0}</code>, <code>nibble_count=2</code></td></tr>
+    <tr><td><code>0</code></td><td><code>0x30</code></td><td><code>PARSE_ADDR</code></td><td><code>cmd_addr = {cmd_addr[27:0], 4'h0}</code>, <code>nibble_count=3</code></td></tr>
+    <tr><td><code>0</code></td><td><code>0x30</code></td><td><code>PARSE_ADDR</code></td><td><code>cmd_addr = {cmd_addr[27:0], 4'h0}</code>, <code>nibble_count=4</code></td></tr>
+    <tr><td><code>0</code></td><td><code>0x30</code></td><td><code>PARSE_ADDR</code></td><td><code>cmd_addr = {cmd_addr[27:0], 4'h0}</code>, <code>nibble_count=5</code></td></tr>
+    <tr><td><code>0</code></td><td><code>0x30</code></td><td><code>PARSE_ADDR</code></td><td><code>cmd_addr = {cmd_addr[27:0], 4'h0}</code>, <code>nibble_count=6</code></td></tr>
+    <tr><td><code>1</code></td><td><code>0x31</code></td><td><code>PARSE_ADDR</code></td><td><code>cmd_addr = {cmd_addr[27:0], 4'h1}</code>, <code>nibble_count=7</code></td></tr>
+    <tr><td><code>0</code></td><td><code>0x30</code></td><td><code>PARSE_ADDR</code></td><td><code>cmd_addr = {cmd_addr[27:0], 4'h0}</code>, <code>nibble_count=8</code> &rarr; 8th nibble complete, transition to <code>PARSE_DATA</code></td></tr>
+    <tr><td><code> </code></td><td><code>0x20</code></td><td><code>PARSE_DATA</code></td><td>Leading space &mdash; stay in <code>PARSE_DATA</code> (whitespace skip)</td></tr>
+    <tr><td><code>D</code></td><td><code>0x44</code></td><td><code>PARSE_DATA</code></td><td><code>cmd_data = {cmd_data[27:0], 4'hD}</code>, <code>nibble_count=1</code></td></tr>
+    <tr><td><code>E</code></td><td><code>0x45</code></td><td><code>PARSE_DATA</code></td><td><code>cmd_data = {cmd_data[27:0], 4'hE}</code>, <code>nibble_count=2</code></td></tr>
+    <tr><td><code>A</code></td><td><code>0x41</code></td><td><code>PARSE_DATA</code></td><td><code>cmd_data = {cmd_data[27:0], 4'hA}</code>, <code>nibble_count=3</code></td></tr>
+    <tr><td><code>D</code></td><td><code>0x44</code></td><td><code>PARSE_DATA</code></td><td><code>cmd_data = {cmd_data[27:0], 4'hD}</code>, <code>nibble_count=4</code></td></tr>
+    <tr><td><code>B</code></td><td><code>0x42</code></td><td><code>PARSE_DATA</code></td><td><code>cmd_data = {cmd_data[27:0], 4'hB}</code>, <code>nibble_count=5</code></td></tr>
+    <tr><td><code>E</code></td><td><code>0x45</code></td><td><code>PARSE_DATA</code></td><td><code>cmd_data = {cmd_data[27:0], 4'hE}</code>, <code>nibble_count=6</code></td></tr>
+    <tr><td><code>E</code></td><td><code>0x45</code></td><td><code>PARSE_DATA</code></td><td><code>cmd_data = {cmd_data[27:0], 4'hE}</code>, <code>nibble_count=7</code></td></tr>
+    <tr><td><code>F</code></td><td><code>0x46</code></td><td><code>PARSE_DATA</code></td><td><code>cmd_data = {cmd_data[27:0], 4'hF}</code>, <code>nibble_count=8</code> &rarr; 8th nibble complete, transition to <code>PARSE_EOL</code></td></tr>
+    <tr><td><code>\n</code></td><td><code>0x0A</code></td><td><code>PARSE_EOL</code></td><td>Command complete. Load <code>m_axil_awaddr=cmd_addr</code>, <code>m_axil_wdata=cmd_data</code>, assert <code>m_axil_awvalid</code>, transition AXI FSM to <code>AXIL_WRITE_AW</code>, parser returns to <code>PARSE_IDLE</code></td></tr>
+  </tbody>
+</table>
+<p>Table (2): Character-by-character trace of <code>W 00000010 DEADBEEF\n</code>. After the final newline, <code>cmd_addr = 0x00000010</code> and <code>cmd_data = 0xDEADBEEF</code> and the AXI write transaction begins.</p>
+
+<a href="img/verilaxi/uart_debug_console.svg"><img src="img/verilaxi/uart_debug_console.svg" class="img-responsive center-block" alt="CPU-less AXI-Lite debug console stack"></a>
+<p>Figure (1): End-to-end debug-console stack. A tiny CLI script sends ASCII commands over UART, the parser turns them into AXI-Lite transactions, and the same path can bring up GPIO, UART peripherals, or DMA register blocks without any CPU inside the FPGA.</p>
+
+<a href="img/verilaxi/snix_uart_axil_master.svg"><img src="img/verilaxi/snix_uart_axil_master.svg" class="img-responsive center-block" alt="snix_uart_axil_master block diagram"></a>
+<p>Figure (2): <code>snix_uart_axil_master</code> architecture. The Parse FSM consumes incoming bytes from <code>snix_uart_lite</code> and fires the AXI-Lite FSM on a completed command. The RESP MUX assembles the response string byte-by-byte and feeds it back through the UART transmitter. The two FSMs run sequentially: the parser stalls while an AXI transaction is in flight.</p>
+
+<h2 class="section-heading">Parse FSM</h2>
+
+<p>
+The parser has four states:
+</p>
+
+<ul>
+  <li><strong><code>PARSE_IDLE</code></strong>: Waiting for the first byte of a command. <code>W</code> or <code>w</code> sets <code>cmd_is_write=1</code> and moves to <code>PARSE_ADDR</code>. <code>R</code> or <code>r</code> clears <code>cmd_is_write</code> and moves to <code>PARSE_ADDR</code>. Whitespace is skipped. Any other byte immediately triggers an <code>ERR</code> response.</li>
+  <li><strong><code>PARSE_ADDR</code></strong>: Accumulating up to 8 hex nibbles into <code>cmd_addr</code>. A leading space before the first nibble is skipped. Non-hex characters trigger <code>ERR</code>. After the 8th nibble, transitions to <code>PARSE_DATA</code> (write) or <code>PARSE_EOL</code> (read).</li>
+  <li><strong><code>PARSE_DATA</code></strong>: Accumulating up to 8 hex nibbles into <code>cmd_data</code>. Same whitespace skip and error handling as <code>PARSE_ADDR</code>. After the 8th nibble, transitions to <code>PARSE_EOL</code>.</li>
+  <li><strong><code>PARSE_EOL</code></strong>: Waiting for the newline that commits the command. An optional <code>\r</code> is tolerated for Windows-style line endings. On <code>\n</code>, the parsed address and data are loaded into the AXI interface and the AXI FSM is kicked off.</li>
+</ul>
+
+<p>
+A critical property of the parser is that it only consumes incoming bytes when the system is fully idle:
+</p>
+
+<pre><code>assign uart_rx_ready = (axil_state == AXIL_IDLE) &amp; ~resp_active;</code></pre>
+
+<p>
+If an AXI transaction is in flight (<code>axil_state != AXIL_IDLE</code>), the parser stalls: no bytes are consumed from the UART RX FIFO. Similarly, if a response is currently being transmitted (<code>resp_active</code>), the parser stalls. The parser and the AXI state machine therefore run strictly sequentially. There is never a situation where a second command begins to be parsed while the first is still on the bus or the first response is still being sent. Every command goes through exactly one complete AXI transaction and one complete response transmission before the next command can start.
+</p>
+
+<p>
+That sequential behavior is deliberate. This block is meant for bring-up and debug, where clarity matters more than bus throughput. A serial log that shows one command, one AXI transaction, and one response at a time is much easier to trust when the rest of the system is still coming up.
+</p>
+
+<h2 class="section-heading">Helper functions</h2>
+
+<p>
+Three SystemVerilog functions implement the nibble-level ASCII conversion, declared as <code>function automatic</code> for purely combinational evaluation:
+</p>
+
+<pre><code>function automatic logic is_hex(input logic [7:0] c);
+    is_hex = ((c &gt;= "0") &amp;&amp; (c &lt;= "9")) ||
+             ((c &gt;= "a") &amp;&amp; (c &lt;= "f")) ||
+             ((c &gt;= "A") &amp;&amp; (c &lt;= "F"));
+endfunction</code></pre>
+
+<pre><code>function automatic logic [3:0] hex_value(input logic [7:0] c);
+    if ((c &gt;= "0") &amp;&amp; (c &lt;= "9")) begin
+        hex_value = c - "0";
+    end else if ((c &gt;= "a") &amp;&amp; (c &lt;= "f")) begin
+        hex_value = (c - "a") + 8'd10;
+    end else begin
+        hex_value = (c - "A") + 8'd10;
+    end
+endfunction</code></pre>
+
+<pre><code>function automatic logic [7:0] hex_ascii(input logic [3:0] nibble);
+    if (nibble &lt; 10) begin
+        hex_ascii = "0" + {4'b0, nibble};
+    end else begin
+        hex_ascii = "A" + {4'b0, (nibble - 4'd10)};
+    end
+endfunction</code></pre>
+
+<p>
+<code>is_hex</code> guards nibble accumulation in <code>PARSE_ADDR</code> and <code>PARSE_DATA</code>. <code>hex_value</code> converts an ASCII character to its 4-bit value. <code>hex_ascii</code> is the inverse, used in response assembly to emit upper-case hex characters. Using functions rather than always blocks makes the intent clear: these are purely combinational operations with no state, no latency, and no side effects.
+</p>
+
+<h2 class="section-heading">AXI-Lite state machine</h2>
+
+<p>
+The AXI-Lite state machine has six states and handles both write and read transactions:
+</p>
+
+<ul>
+  <li><strong><code>AXIL_IDLE</code></strong>: Waiting for the parse FSM to complete a command.</li>
+  <li><strong><code>AXIL_WRITE_AW</code></strong>: Drives <code>awvalid</code> and waits for <code>awready</code> from the slave. On handshake, deasserts <code>awvalid</code> and moves to <code>AXIL_WRITE_W</code>.</li>
+  <li><strong><code>AXIL_WRITE_W</code></strong>: Drives <code>wvalid</code> and waits for <code>wready</code>. On handshake, asserts <code>bready</code> and moves to <code>AXIL_WRITE_B</code>.</li>
+  <li><strong><code>AXIL_WRITE_B</code></strong>: Waits for the write response (<code>bvalid</code>). On handshake, arms the <code>OK</code> response and returns to <code>AXIL_IDLE</code>.</li>
+  <li><strong><code>AXIL_READ_AR</code></strong>: Drives <code>arvalid</code> and waits for <code>arready</code>. On handshake, asserts <code>rready</code> and moves to <code>AXIL_READ_R</code>.</li>
+  <li><strong><code>AXIL_READ_R</code></strong>: Waits for read data (<code>rvalid</code>). On handshake, latches <code>m_axil_rdata</code>, arms the <code>RESP_READ</code> response, and returns to <code>AXIL_IDLE</code>.</li>
+</ul>
+
+<p>
+The AW and W channels are issued sequentially: <code>AXIL_WRITE_AW</code> completes before <code>AXIL_WRITE_W</code> begins. This trades theoretical throughput for robustness: some AXI-Lite slave implementations do not correctly handle simultaneous AW and W assertion, particularly simple register blocks and CSR arrays. For a bring-up and debug master where correctness is more important than throughput, this is the right trade-off.
+</p>
+
+<h2 class="section-heading">Response assembly</h2>
+
+<p>
+Responses are assembled byte by byte from a combinational <code>always_comb</code> block that selects the current response byte based on <code>resp_kind</code> and <code>resp_idx</code>. A clocked counter increments <code>resp_idx</code> each time the UART transmitter accepts a byte.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Response type</th><th>Content</th><th><code>resp_len</code> (bytes)</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>RESP_OK</code></td><td><code>OK\n</code></td><td>3</td><td>Emitted after a successful write transaction</td></tr>
+    <tr><td><code>RESP_ERR</code></td><td><code>ERR\n</code></td><td>4</td><td>Emitted on any parse error; no AXI transaction is issued</td></tr>
+    <tr><td><code>RESP_READ</code></td><td><code>D &lt;addr8hex&gt; &lt;data8hex&gt;\n</code></td><td>20</td><td><code>"D "</code> + 8 address chars + <code>" "</code> + 8 data chars + <code>"\n"</code></td></tr>
+  </tbody>
+</table>
+<p>Table (3): Response types, content, and byte lengths. The <code>RESP_READ</code> response is exactly 20 bytes: 1 + 1 + 8 + 1 + 8 + 1.</p>
+
+<p>
+For <code>RESP_READ</code>, the combinational mux emits response characters one by one. Indices 0&ndash;1 are the literal <code>"D "</code> prefix. Indices 2&ndash;9 are the eight hex characters of the address, generated by calling <code>hex_ascii</code> on successive nibbles of <code>cmd_addr</code> from MSB to LSB. Index 10 is a space. Indices 11&ndash;18 are the eight hex characters of <code>read_data_latched</code>. Index 19 is the terminating newline.
+</p>
+
+<h2 class="section-heading">Write transaction timing</h2>
+
+<script type="WaveDrom">
+{ "signal": [
+  { "name": "AWVALID", "wave": "01....0...." },
+  { "name": "AWREADY", "wave": "0.1...0...." },
+  { "name": "WVALID",  "wave": "01....0...." },
+  { "name": "WREADY",  "wave": "0..10......" },
+  {},
+  { "name": "BVALID",  "wave": "0....1.0..." },
+  { "name": "BREADY",  "wave": "0....1.0..." },
+  {},
+  { "name": "resp_tx", "wave": "0......1..0" }
+],
+"head": { "text": "AXI-Lite write + OK response  ·  triggered by: W 00000010 DEADBEEF\\n" },
+"foot": { "text": "After BVALID/BREADY, OK response is sent and resp_active drops" },
+"config": { "hscale": 1 }
+}
+</script>
+<p>Figure (3): Parse FSM and AXI write transaction sequenced for <code>W 00000010 DEADBEEF\n</code>. At the newline, the parser returns to <code>IDLE</code> and the AXI FSM begins the write sequence. <code>resp_active</code> asserts after the write response is received and stays high until the last byte of <code>OK\n</code> has been transmitted.</p>
+
+<h2 class="section-heading">Testbench</h2>
+
+<p>
+The testbench instantiates the DUT alongside a second <code>snix_uart_lite</code> instance representing the host side of the serial link. The two UART cores are connected back-to-back. Simulation parameters are <code>CLK_FREQ_HZ=10MHz</code> and <code>BAUD_RATE=1MHz</code>, giving a divider of 10 clocks per UART bit.
+</p>
+
+<p>
+Bytes received by the host UART are pushed onto a SystemVerilog queue. The <code>host_send_string</code> task sends a string one byte at a time; <code>host_expect_string</code> drains bytes from the queue and calls <code>$fatal</code> on any mismatch. The AXI slave is a memory model with 1024 words of address space.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>#</th><th>Command sent</th><th>Expected response</th><th>What it tests</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td><code>W 00000010 DEADBEEF\n</code></td><td><code>OK\n</code></td><td>Write transaction: full AW + W + B sequence, <code>OK</code> response</td></tr>
+    <tr><td>2</td><td><code>R 00000010\n</code></td><td><code>D 00000010 DEADBEEF\n</code></td><td>Read transaction: AR + R sequence, read-back of the previously written value</td></tr>
+    <tr><td>3</td><td><code>X 00000000\n</code></td><td><code>ERR\n</code></td><td>Parse error: unrecognised command byte, no AXI transaction issued</td></tr>
+  </tbody>
+</table>
+<p>Table (4): Testbench cases. Test 2 depends on test 1 having written <code>0xDEADBEEF</code> to address <code>0x10</code>.</p>
+
+<pre><code>make run TESTNAME=uart_axil_master</code></pre>
+
+<h2 class="section-heading">Real hardware bring-up session</h2>
+
+<p>
+The module was validated on hardware using <code>uart_cmd.py</code>, a minimal Python script that opens the serial port with raw <code>termios</code>, sends one ASCII command, and prints the response. The following session is from the actual bring-up of the GPIO peripheral:
+</p>
+
+<pre><code>$ ./uart_cmd.py "W 00000008 00000001"
+TX: W 00000008 00000001
+RX: OK
+$ ./uart_cmd.py "R 00000008"
+TX: R 00000008
+RX: D 00000008 00000002
+$ ./uart_cmd.py "R 00000004"
+TX: R 00000004
+RX: D 00000004 00000000</code></pre>
+
+<p>
+Address <code>0x00000008</code> maps to the GPIO <code>BTN_EDGE</code> register, which captures button-press events as a sticky one-hot flag. Writing <code>0x00000001</code> clears bit 0. Reading back returns <code>0x00000002</code>, indicating a second button was pressed in the intervening time. No processor, no firmware, no JTAG: the entire GPIO bring-up was performed through this serial command interface.
+</p>
+
+<h2 class="section-heading">The same interface works for any peripheral</h2>
+
+<p>
+The <code>snix_uart_axil_master</code> does not know or care whether it is talking to a GPIO block, a DMA engine, or a custom CSR array. It issues AXI-Lite transactions to whatever address it is told to access. DMA source address, destination address, transfer length, and control registers can all be written with the same one-liner that toggled an LED. Before the application processor is powered, before U-Boot runs, and before any software stack is present, the serial cable is the control plane.
+</p>
+
+<hr>
+
+<h2 class="section-heading">GPIO: the first peripheral on the bus</h2>
+
+<p>
+GPIO is the right first peripheral to validate this infrastructure. Write a register, see an LED blink. That single action confirms the clock is running, reset has released, the AXI fabric is alive, and the register write path is working end-to-end. No protocol stack, no packet framing, no driver. The GPIO peripheral described here, <code>snix_axil_gpio</code> from <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>, also exposes the first real hardware problems that simulation tends to hide: clock-domain crossing on switch inputs, mechanical contact bounce on buttons, and reliable sticky edge detection for polled bring-up loops.
+</p>
+
+<h2 class="section-heading">Why GPIO for board bring-up</h2>
+
+<p>
+GPIO is the "hello world" of hardware. But it also exposes the first real hardware problems that a purely simulation-based workflow tends to hide. Buttons bounce: a single mechanical press generates a burst of rapid transitions that software sees as multiple presses unless the logic suppresses them. Switch inputs cross a clock domain: a signal that changes asynchronously to the system clock can leave a flip-flop output in an undefined state if the timing is unlucky. And edge detection requires more thought than it appears: a brief button press that occurs between two polling iterations must not be lost.
+</p>
+
+<p>
+A proper GPIO peripheral addresses all three of these issues in hardware. <code>snix_axil_gpio</code> exposes LEDs and RGB outputs as writable registers, switch and button state as readable registers, and a sticky rising-edge capture register with write-one-to-clear semantics for buttons. The AXI-Lite slave interface means it integrates directly into any AXI fabric, and it can be driven without a CPU using the UART master described above.
+</p>
+
+<h2 class="section-heading">Register map</h2>
+
+<p>
+The peripheral exposes five 32-bit registers. The default configuration uses <code>NUM_LEDS=4</code>, <code>NUM_RGB_LEDS=2</code>, <code>NUM_SWITCHES=4</code>, and <code>NUM_BUTTONS=4</code>.
+</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Address</th>
+      <th>Name</th>
+      <th>Access</th>
+      <th>Width</th>
+      <th>Bit field description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>0x00</code></td>
+      <td><code>GPIO_OUT</code></td>
+      <td>R/W</td>
+      <td>4</td>
+      <td>[3:0] LED outputs. Write to drive LEDs; read back reflects current register value. WSTRB-masked.</td>
+    </tr>
+    <tr>
+      <td><code>0x04</code></td>
+      <td><code>GPIO_IN</code></td>
+      <td>RO</td>
+      <td>8</td>
+      <td>[3:0] synchronized switch inputs (<code>sw_sync2</code>); [7:4] debounced button inputs (<code>btn_db</code>). Read-only; writes are ignored.</td>
+    </tr>
+    <tr>
+      <td><code>0x08</code></td>
+      <td><code>BTN_EDGE</code></td>
+      <td>R/W1C</td>
+      <td>4</td>
+      <td>[3:0] sticky rising-edge capture for each button. Set on the first rising edge after reset or after being cleared. Write 1 to a bit to clear it; write 0 has no effect.</td>
+    </tr>
+    <tr>
+      <td><code>0x0C</code></td>
+      <td><code>RGB0</code></td>
+      <td>R/W</td>
+      <td>3</td>
+      <td>[2:0] RGB channel values for the first RGB LED: bit 0 = R, bit 1 = G, bit 2 = B. WSTRB-masked.</td>
+    </tr>
+    <tr>
+      <td><code>0x10</code></td>
+      <td><code>RGB1</code></td>
+      <td>R/W</td>
+      <td>3</td>
+      <td>[2:0] RGB channel values for the second RGB LED: bit 0 = R, bit 1 = G, bit 2 = B. WSTRB-masked.</td>
+    </tr>
+  </tbody>
+</table>
+<p>Table (5): <code>snix_axil_gpio</code> register map. All registers are 32-bit aligned; unused bits read as zero.</p>
+
+<a href="img/verilaxi/snix_axil_gpio.svg"><img src="img/verilaxi/snix_axil_gpio.svg" class="img-responsive center-block" alt="snix_axil_gpio block diagram"></a>
+<p>Figure (3): <code>snix_axil_gpio</code> architecture. Switch inputs pass through a 2-FF synchronizer; button inputs add a per-button debounce counter stage; LED and RGB outputs are write-only registers; the BTN_EDGE register provides sticky W1C edge capture for buttons.</p>
+
+<h2 class="section-heading">LED and RGB output path</h2>
+
+<p>
+Writing to <code>GPIO_OUT</code> drives the <code>gpio_led</code> output bus; writing to <code>RGB0</code> or <code>RGB1</code> drives the corresponding three-bit slice of the <code>gpio_rgb</code> bus. All writes are WSTRB-aware, and the hardware builds a per-bit enable mask before updating any register:
+</p>
+
+<pre><code>always_comb begin
+    write_mask = '0;
+    for (int i = 0; i < DATA_WIDTH/8; i++) begin
+        write_mask[i*8 +: 8] = {8{wstrb_reg[i]}};
+    end
+end</code></pre>
+
+<p>
+Numerical examples: writing <code>0xA</code> (binary <code>1010</code>) to <code>GPIO_OUT</code> turns on LEDs 3 and 1. Writing <code>0x5</code> (binary <code>101</code>) to <code>RGB0</code> sets R=1, G=0, B=1 &mdash; magenta. Writing <code>0x3</code> (binary <code>011</code>) to <code>RGB1</code> sets R=1, G=1, B=0 &mdash; yellow. The readback path is symmetric, allowing software to perform read-modify-write operations.
+</p>
+
+<h2 class="section-heading">Switch synchronization</h2>
+
+<p>
+Switch inputs arrive from off-chip logic that is not synchronous to the FPGA clock. When an asynchronous signal changes near a clock edge, the flip-flop that captures it may resolve to an unpredictable value. A two-stage synchronizer makes the probability of unresolved metastability negligible: the first flip-flop resolves within a clock period in all but extremely rare cases, and the second flip-flop never sees a transitioning input.
+</p>
+
+<pre><code>sw_sync1 &lt;= gpio_sw;
+sw_sync2 &lt;= sw_sync1;</code></pre>
+
+<p>
+Mechanical slide switches hold a stable position for hundreds of milliseconds, so no further filtering beyond the two-FF chain is needed. The synchronized value <code>sw_sync2</code> appears in <code>GPIO_IN[3:0]</code>.
+</p>
+
+<h2 class="section-heading">Button debounce</h2>
+
+<p>
+Buttons are different from switches. When a mechanical push-button contact closes, contact chatter produces a burst of rapid open-close transitions lasting between 1 and 20 milliseconds. The FPGA clock samples at hundreds of megahertz and sees every edge as a distinct event. Without debounce logic, a single press appears as dozens.
+</p>
+
+<p>
+The debounce algorithm in <code>snix_axil_gpio</code> works on a per-button basis. Each button has an independent counter. The counter increments every clock cycle that the synchronized input disagrees with the currently committed debounced value. When the counter reaches <code>DEBOUNCE_CYCLES-1</code>, the debounced output is updated and the counter resets. If the input returns to the committed value at any point before the counter expires, the counter resets without updating the output.
+</p>
+
+<pre><code>for (int i = 0; i &lt; NUM_BUTTONS; i++) begin
+    if (btn_sync2[i] == btn_db[i]) begin
+        btn_cnt[i] &lt;= '0;
+    end else if (btn_cnt[i] == BTN_CNT_W'(DEBOUNCE_CYCLES-1)) begin
+        btn_db[i]  &lt;= btn_sync2[i];
+        btn_cnt[i] &lt;= '0;
+    end else begin
+        btn_cnt[i] &lt;= btn_cnt[i] + BTN_CNT_W'(1);
+    end
+end</code></pre>
+
+<p>
+At a 100 MHz system clock, setting <code>DEBOUNCE_CYCLES=10_000_000</code> gives a 100 ms debounce window. In simulation, <code>DEBOUNCE_CYCLES=4</code> exercises the same counter logic in a handful of clock cycles rather than millions.
+</p>
+
+<h2 class="section-heading">Debounce and edge capture waveform</h2>
+
+<script type="WaveDrom">
+{ "signal": [
+  { "name": "raw_btn",   "wave": "l.hlhhhhhhhh" },
+  { "name": "btn_sync2", "wave": "l...hlhhhhhh" },
+  { "name": "btn_db",    "wave": "l.........h." },
+  { "name": "btn_edge",  "wave": "l..........h" }
+],
+"head": { "text": "Button debounce and edge capture  (DEBOUNCE_CYCLES = 4)" },
+"config": { "hscale": 1 }
+}
+</script>
+<p>Figure (4): Button debounce and edge capture. <code>raw_btn</code> bounces briefly on press; <code>btn_sync2</code> is the synchronized button input after the two-FF chain; <code>btn_db</code> only commits the new value after four consecutive stable cycles; <code>btn_edge</code> latches the rising edge and holds it until explicitly cleared.</p>
+
+<h2 class="section-heading">Edge capture and W1C semantics</h2>
+
+<p>
+A debounced button output tells you the current state of the button: pressed or released. But if you are running a control loop that polls the GPIO registers periodically, a brief button press that starts and ends between two polling iterations is invisible in the debounced output. Sticky edge capture solves this.
+</p>
+
+<p>
+The <code>BTN_EDGE</code> register bit for each button is set on the first rising edge of <code>btn_db</code> after reset or after being cleared, and it remains set until software explicitly clears it. A brief press is guaranteed to be visible at the next read, regardless of how much time passes between press and poll.
+</p>
+
+<pre><code>assign btn_rise = btn_db &amp; ~btn_db_d;  // 1-cycle pulse on rising edge
+
+btn_edge &lt;= (btn_edge &amp; ~clr_mask) | btn_rise;</code></pre>
+
+<p>
+The W1C (write-one-to-clear) idiom is the standard hardware convention for interrupt-status-like registers. Writing a 1 to a bit clears it; writing a 0 leaves it unchanged. The clear mask is built from the write data and the write strobe:
+</p>
+
+<pre><code>clr_mask[NUM_BUTTONS-1:0] = wdata_reg[NUM_BUTTONS-1:0] &amp; write_mask[NUM_BUTTONS-1:0];</code></pre>
+
+<p>
+Each button's edge bit is independent. The following hardware session on the Arty S7-50 board confirms it:
+</p>
+
+<pre><code>$ ./uart_cmd.py "R 00000008"     # BTN_EDGE
+RX: D 00000008 00000000          # clean
+
+$ ./uart_cmd.py "R 00000008"     # after pressing BTN1
+RX: D 00000008 00000002          # bit 1 set
+
+$ ./uart_cmd.py "R 00000008"     # after pressing BTN0
+RX: D 00000008 00000003          # bits 0 and 1 set
+
+$ ./uart_cmd.py "R 00000004"     # GPIO_IN
+RX: D 00000004 00000000          # buttons released
+
+$ ./uart_cmd.py "W 00000008 00000001"    # W1C clear bit 0
+RX: OK
+
+$ ./uart_cmd.py "R 00000008"
+RX: D 00000008 00000002          # bit 0 cleared, bit 1 still pending</code></pre>
+
+<h2 class="section-heading">Generate block for DEBOUNCE_CYCLES</h2>
+
+<p>
+Waiting for millions of clock cycles in simulation is impractical. A <code>generate</code> block lets the same RTL target both simulation and hardware with a single parameter:
+</p>
+
+<pre><code>generate
+    if (DEBOUNCE_CYCLES &lt;= 1) begin : GEN_BTN_NODEBOUNCE
+        always_ff @(posedge clk or negedge rst_n) begin
+            if (!rst_n) begin
+                btn_db &lt;= '0;
+            end else begin
+                btn_db &lt;= btn_sync2;
+            end
+        end
+    end else begin : GEN_BTN_DEBOUNCE
+        // per-button counter logic
+        ...
+    end
+endgenerate</code></pre>
+
+<p>
+Setting <code>DEBOUNCE_CYCLES=4</code> in the testbench exercises the counter path but completes debounce in 4 cycles rather than millions, making simulation fast without sacrificing behavioral coverage of the counter logic itself.
+</p>
+
+<h2 class="section-heading">AXI-Lite interface and register slices</h2>
+
+<p>
+The peripheral uses three <code>snix_register_slice</code> instances &mdash; one on the AW channel, one on the W channel, and one on the AR channel &mdash; to break the combinatorial paths between the AXI fabric and the internal register logic. This improves timing closure at the cost of one additional cycle of latency on the address and data acceptance paths. All five registers respond with a fixed <code>OKAY</code> response. Writes to read-only registers (such as <code>GPIO_IN</code>) are silently ignored.
+</p>
+
+<h2 class="section-heading">Testbench walkthrough</h2>
+
+<p>
+The testbench <code>test_axil_gpio.sv</code> runs seven sequential test phases with <code>NUM_BUTTONS=2</code>, <code>NUM_SWITCHES=4</code>, <code>NUM_RGB_LEDS=2</code>, <code>NUM_LEDS=4</code>, and <code>DEBOUNCE_CYCLES=4</code>:
+</p>
+
+<ol>
+  <li><strong>LED write.</strong> Writes <code>0xA</code> to <code>GPIO_OUT</code> and asserts <code>gpio_led=4'b1010</code>.</li>
+  <li><strong>RGB write and readback.</strong> Writes <code>0x5</code> to <code>RGB0</code> and <code>0x3</code> to <code>RGB1</code>, then reads both back. Confirms <code>gpio_rgb[2:0]=101</code> and <code>gpio_rgb[5:3]=011</code>.</li>
+  <li><strong>Switch read.</strong> Sets <code>gpio_sw=4'b0101</code>, waits 3 cycles for the two-FF synchronizer to propagate, then reads <code>GPIO_IN</code>. Expects <code>rd_data[3:0]=0101</code>.</li>
+  <li><strong>Button debounce.</strong> Toggles <code>gpio_btn[0]</code> high for 1 cycle, low for 1 cycle, then holds high for 8 cycles. Reads <code>GPIO_IN</code> and confirms <code>rd_data[4]=1</code>. The two bounce pulses do not satisfy the <code>DEBOUNCE_CYCLES=4</code> threshold; the final stable hold does.</li>
+  <li><strong>Edge capture read.</strong> Reads <code>BTN_EDGE</code> and confirms <code>rd_data[1:0]=01</code>: bit 0 is set because <code>btn[0]</code> rose; bit 1 is clear because <code>btn[1]</code> was never pressed.</li>
+  <li><strong>W1C clear.</strong> Writes <code>0x1</code> to <code>BTN_EDGE</code>, then reads back. Expects <code>rd_data[1:0]=00</code>.</li>
+  <li><strong>Edge relatch after clear.</strong> Releases and re-presses <code>btn[0]</code>. Reads <code>BTN_EDGE</code> and expects <code>rd_data[1:0]=01</code>: the cleared bit relatchs on the next rising edge.</li>
+</ol>
+
+<pre><code>[AXIL-GPIO][LED ] gpio_led=0xa
+[AXIL-GPIO][RGB ] rgb0=0x5 rgb1=0x3
+[AXIL-GPIO][IN  ] gpio_in=0x00000005
+[AXIL-GPIO][EDGE] btn_edge=0x1
+test_axil_gpio: PASS</code></pre>
+
+<pre><code>make run TESTNAME=axil_gpio</code></pre>
+
+<h2 class="section-heading">Hardware validation and the metastability lesson</h2>
+
+<p>
+The GPIO peripheral was validated on the Arty S7-50 board using the UART master as the command interface. The BTN_EDGE hardware session above is a verbatim capture from that board.
+</p>
+
+<p>
+An earlier iteration of the UART receiver did not include the two-FF synchronizer on the <code>uart_rx</code> pin. Simulation passed without it because the testbench drives <code>uart_rx</code> synchronously. On hardware, the UART RX pin arrives asynchronously from the USB-to-UART bridge, and the single flip-flop at the receiver input occasionally entered a metastable state. The result was corrupted frames and AXI transactions that appeared valid but carried wrong addresses or data. Adding the two-FF synchronizer resolved the issue entirely. This is the classic example of a hardware bug that simulation cannot find: the physical phenomenon of metastability simply does not exist in a synchronous simulation model.
+</p>
+
+<h2 class="section-heading">Summary</h2>
+
+<p>
+<code>snix_uart_axil_master</code> is a compact ASCII command parser and AXI-Lite bus master that enables a host computer to read and write any AXI-Lite register in an FPGA without requiring a processor in the fabric. The two-FSM architecture &mdash; parse FSM stalled by <code>uart_rx_ready</code> whenever the AXI FSM is active &mdash; ensures that commands are processed strictly sequentially and that the design works correctly with any compliant AXI-Lite slave. The sequential AW-then-W write channel approach trades theoretical throughput for robustness with real slaves.
+</p>
+
+<p>
+<code>snix_axil_gpio</code> is the natural first peripheral to validate this infrastructure. It exposes the three problems that matter most in real hardware: clock-domain crossing (handled by 2-FF synchronizers on switch and button inputs), mechanical bounce (handled by a per-button stable-period counter with a parameterized debounce window), and reliable event capture for polled loops (handled by a sticky W1C edge-capture register). Together, the UART master and the GPIO peripheral form a practical CPU-less debug console: a host laptop issues human-readable ASCII commands and the FPGA executes AXI-Lite transactions directly against real hardware registers.
+</p>
+
+<p>
+Read next:<br>
+<a href="uart_lite.html">Building a UART Core and Turning It into an AXI-Lite Peripheral</a> &mdash; the UART byte transport and register-slice slave that underpin this entire control plane.<br>
+Implementation pointers in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>: <code>rtl/uart/snix_uart_axil_master.sv</code>, <code>rtl/axil/snix_axil_gpio.sv</code>, <code>tb/tests/uart/test_uart_axil_master.sv</code>, <code>tb/tests/axil/test_axil_gpio.sv</code>.
+</p>
+
+<p>References:<br>
+[1] ARM. AMBA AXI and ACE Protocol Specification. 2011.<br>
+[2] Jack Ganssle. A Guide to Debouncing. The Ganssle Group, 2004.<br>
+[3] Clifford E. Cummings. Synthesis and Scripting Techniques for Designing Multi-Asynchronous Clock Designs. SNUG 2001.<br>
+[4] <a href="uart_lite.html">Building a UART Core and Turning It into an AXI-Lite Peripheral - sistenix.com</a>
+</p>
+
+                    <hr>
+
+                    <p>Also available in <a href="https://github.com/nelsoncsc/verilaxi">GitHub</a>.</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson@sistenix.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/jquery.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/clean-blog.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wavedrom/3.1.0/skins/default.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wavedrom/3.1.0/wavedrom.min.js"></script>
+    <script>WaveDrom.ProcessAll();</script>
+
+</body>
+
+</html>

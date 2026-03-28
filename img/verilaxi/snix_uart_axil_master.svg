@@ -1,0 +1,604 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="920"
+   height="390"
+   viewBox="0 0 920 390"
+   version="1.1"
+   id="svg43"
+   sodipodi:docname="snix_uart_axil_master.svg"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview43"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.5084945"
+     inkscape:cx="459.72989"
+     inkscape:cy="192.57611"
+     inkscape:window-width="1512"
+     inkscape:window-height="854"
+     inkscape:window-x="0"
+     inkscape:window-y="38"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg43" />
+  <defs
+     id="defs2">
+    <marker
+       id="arr"
+       markerWidth="8"
+       markerHeight="8"
+       refX="7"
+       refY="3"
+       orient="auto">
+      <path
+         d="M0,0 L0,6 L8,3 z"
+         fill="#444"
+         id="path1" />
+    </marker>
+    <marker
+       id="arr-b"
+       markerWidth="8"
+       markerHeight="8"
+       refX="7"
+       refY="3"
+       orient="auto">
+      <path
+         d="M0,0 L0,6 L8,3 z"
+         fill="#666"
+         id="path2" />
+    </marker>
+  </defs>
+  <!-- Background -->
+  <rect
+     width="920"
+     height="390"
+     fill="white"
+     id="rect2" />
+  <!-- Outer module border (dashed) -->
+  <rect
+     x="8"
+     y="8"
+     width="904"
+     height="374"
+     rx="10"
+     fill="#fafafa"
+     stroke="#555"
+     stroke-width="1.5"
+     stroke-dasharray="7,4"
+     id="rect3" />
+  <text
+     x="450"
+     y="28"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="14"
+     font-weight="bold"
+     fill="#222"
+     id="text3">
+    snix_uart_axil_master
+  </text>
+  <!-- ── UART pins (left) ── -->
+  <text
+     x="18"
+     y="118"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="11"
+     fill="#222"
+     id="text4">uart_rx →</text>
+  <text
+     x="18"
+     y="244"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="11"
+     fill="#222"
+     id="text5">← uart_tx</text>
+  <!-- ── snix_uart_lite ── -->
+  <rect
+     x="92"
+     y="60"
+     width="148"
+     height="224"
+     rx="7"
+     fill="#e8f5e9"
+     stroke="#2e7d32"
+     stroke-width="2"
+     id="rect5" />
+  <text
+     x="166"
+     y="80"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="12"
+     font-weight="bold"
+     fill="#2e7d32"
+     id="text6">snix_uart_lite</text>
+  <rect
+     x="106"
+     y="90"
+     width="120"
+     height="34"
+     rx="4"
+     fill="white"
+     stroke="#2e7d32"
+     stroke-width="1"
+     id="rect6" />
+  <text
+     x="166"
+     y="112"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#333"
+     id="text7">RX FSM → RX FIFO</text>
+  <rect
+     x="106"
+     y="178"
+     width="120"
+     height="34"
+     rx="4"
+     fill="white"
+     stroke="#2e7d32"
+     stroke-width="1"
+     id="rect7" />
+  <text
+     x="166"
+     y="200"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#333"
+     id="text8">TX FIFO ← TX FSM</text>
+  <text
+     x="166"
+     y="152"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text9">rx_data / rx_valid</text>
+  <text
+     x="166"
+     y="164"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text10">tx_data / tx_ready</text>
+  <text
+     x="166"
+     y="240"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text11">CLK_FREQ_HZ</text>
+  <text
+     x="166"
+     y="254"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text12">BAUD_RATE</text>
+  <text
+     x="166"
+     y="270"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text13">FIFO_DEPTH</text>
+  <!-- ── Parse FSM ── -->
+  <rect
+     x="288"
+     y="52"
+     width="168"
+     height="140"
+     rx="7"
+     fill="#e3f2fd"
+     stroke="#1565c0"
+     stroke-width="2"
+     id="rect13" />
+  <text
+     x="372"
+     y="78"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="12"
+     font-weight="bold"
+     fill="#1565c0"
+     id="text14">Parse FSM</text>
+  <rect
+     x="302"
+     y="86"
+     width="140"
+     height="24"
+     rx="3"
+     fill="white"
+     stroke="#1565c0"
+     stroke-width="1"
+     id="rect14" />
+  <text
+     x="372"
+     y="103"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#333"
+     id="text15">PARSE_IDLE</text>
+  <rect
+     x="302"
+     y="116"
+     width="140"
+     height="24"
+     rx="3"
+     fill="white"
+     stroke="#1565c0"
+     stroke-width="1"
+     id="rect15" />
+  <text
+     x="372"
+     y="133"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#333"
+     id="text16">PARSE_ADDR  (8 nibbles)</text>
+  <rect
+     x="302"
+     y="146"
+     width="140"
+     height="24"
+     rx="3"
+     fill="white"
+     stroke="#1565c0"
+     stroke-width="1"
+     id="rect16" />
+  <text
+     x="372"
+     y="163"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#333"
+     id="text17">PARSE_DATA  (8 nibbles)</text>
+  <rect
+     x="302"
+     y="174"
+     width="140"
+     height="14"
+     rx="3"
+     fill="#ffffff"
+     stroke="#1565c0"
+     stroke-width="1"
+     id="rect17" />
+  <text
+     x="372"
+     y="185"
+     text-anchor="middle"
+     font-family="Helvetica, Arial, sans-serif"
+     font-size="9px"
+     fill="#333333"
+     id="text18">PARSE_EOL → fires AXI</text>
+  <text
+     x="372"
+     y="208"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text19">uart_rx_ready gated by</text>
+  <text
+     x="372"
+     y="220"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text20">axil_state==IDLE ∧ ¬resp</text>
+  <!-- ── AXI-Lite FSM ── -->
+  <rect
+     x="288"
+     y="224"
+     width="182"
+     height="128"
+     rx="7"
+     fill="#fce4ec"
+     stroke="#c62828"
+     stroke-width="2"
+     id="rect20" />
+  <text
+     x="379"
+     y="246"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="12"
+     font-weight="bold"
+     fill="#c62828"
+     id="text21">AXI-Lite FSM</text>
+  <rect
+     x="309"
+     y="254"
+     width="140"
+     height="24"
+     rx="3"
+     fill="white"
+     stroke="#c62828"
+     stroke-width="1"
+     id="rect21" />
+  <text
+     x="379"
+     y="270"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#333"
+     id="text22">WR: AW → W → B → IDLE</text>
+  <rect
+     x="309"
+     y="284"
+     width="140"
+     height="24"
+     rx="3"
+     fill="white"
+     stroke="#c62828"
+     stroke-width="1"
+     id="rect22" />
+  <text
+     x="379"
+     y="300"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#333"
+     id="text23">RD: AR → R → IDLE</text>
+  <text
+     x="379"
+     y="326"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text24">drives m_axil_* outputs</text>
+  <text
+     x="379"
+     y="340"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text25">latches rdata on R handshake</text>
+  <!-- ── RESP MUX ── -->
+  <rect
+     x="508"
+     y="168"
+     width="148"
+     height="118"
+     rx="7"
+     fill="#fff8e1"
+     stroke="#e65100"
+     stroke-width="2"
+     id="rect25" />
+  <text
+     x="582"
+     y="188"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="12"
+     font-weight="bold"
+     fill="#e65100"
+     id="text26">RESP MUX</text>
+  <rect
+     x="522"
+     y="196"
+     width="120"
+     height="20"
+     rx="3"
+     fill="white"
+     stroke="#e65100"
+     stroke-width="1"
+     id="rect26" />
+  <text
+     x="582"
+     y="210"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#333"
+     id="text27">OK\n  (3 bytes)</text>
+  <rect
+     x="522"
+     y="222"
+     width="120"
+     height="20"
+     rx="3"
+     fill="white"
+     stroke="#e65100"
+     stroke-width="1"
+     id="rect27" />
+  <text
+     x="582"
+     y="236"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#333"
+     id="text28">ERR\n  (4 bytes)</text>
+  <rect
+     x="522"
+     y="248"
+     width="120"
+     height="20"
+     rx="3"
+     fill="white"
+     stroke="#e65100"
+     stroke-width="1"
+     id="rect28" />
+  <text
+     x="582"
+     y="262"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#333"
+     id="text29">D addr data\n  (20 bytes)</text>
+  <text
+     x="582"
+     y="280"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text30">resp_idx counter</text>
+  <!-- ── AXI-Lite Master port (right) ── -->
+  <text
+     x="772"
+     y="252"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     id="text31">→ AWADDR/AWVALID</text>
+  <text
+     x="772"
+     y="268"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     id="text32">→ WDATA/WVALID</text>
+  <text
+     x="772"
+     y="284"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     id="text33">← BRESP/BVALID</text>
+  <text
+     x="772"
+     y="300"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     id="text34">→ ARADDR/ARVALID</text>
+  <text
+     x="772"
+     y="316"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     id="text35">← RDATA/RVALID</text>
+  <text
+     x="796"
+     y="338"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     font-weight="bold"
+     id="text36">AXI-Lite</text>
+  <text
+     x="796"
+     y="352"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     font-weight="bold"
+     id="text37">Master</text>
+  <!-- ── Arrows ── -->
+  <!-- uart_rx → uart_lite RX -->
+  <line
+     x1="80"
+     y1="116"
+     x2="92"
+     y2="108"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line37" />
+  <!-- uart_lite TX → uart_tx -->
+  <line
+     x1="92"
+     y1="194"
+     x2="80"
+     y2="242"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line38" />
+  <!-- uart_lite rx_data → Parse FSM -->
+  <line
+     x1="240"
+     y1="108"
+     x2="288"
+     y2="128"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line39" />
+  <!-- Parse FSM → AXI FSM (fires on EOL) -->
+  <line
+     x1="379"
+     y1="198"
+     x2="379"
+     y2="224"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line40" />
+  <!-- AXI FSM → AXI master output -->
+  <line
+     x1="470"
+     y1="288"
+     x2="770"
+     y2="288"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line41" />
+  <!-- AXI FSM → RESP MUX (triggers resp_active) -->
+  <line
+     x1="470"
+     y1="258"
+     x2="508"
+     y2="228"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line42" />
+  <!-- RESP MUX → uart_lite TX -->
+  <polyline
+     points="508,240 460,240 460,196 240,196"
+     fill="none"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="polyline42" />
+  <!-- AXI master response back to AXI FSM -->
+  <polyline
+     points="770,270 748,270 748,300 500,300 500,280 470,280"
+     fill="none"
+     stroke="#888"
+     stroke-width="1"
+     stroke-dasharray="4,3"
+     marker-end="url(#arr-b)"
+     id="polyline43" />
+  <!-- Parameter note -->
+  <text
+     x="460"
+     y="375"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#999"
+     id="text43">
+    Parameters: ADDR_WIDTH · DATA_WIDTH · CLK_FREQ_HZ · BAUD_RATE · FIFO_DEPTH
+  </text>
+</svg>

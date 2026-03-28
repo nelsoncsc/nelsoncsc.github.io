@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - Building a UART core and turning it into an AXI-Lite peripheral">
+    <meta name="keywords" content="hardware, UART, serial, FIFO, FSM, baud rate, AXI-Lite, register interface, SystemVerilog, peripheral, CPU peripheral, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>Building a UART Core and Turning It into an AXI-Lite Peripheral</title>
+
+    <link rel="canonical" href="https://sistenix.com/uart_lite.html">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="/">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="/">Home</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/nelsoncsc/nelsoncsc">About</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>Building a UART Core and Turning It into an AXI-Lite Peripheral</h1>
+                        <h2 class="subheading">From 8N1 framing and TX/RX FSMs to a two-register UART peripheral that any CPU or AXI-Lite master can use</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on March 25, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+
+<p>
+Universal Asynchronous Receiver-Transmitters are among the simplest and most useful digital interfaces in embedded systems. Despite the availability of much faster links such as USB, Ethernet, PCIe, and HDMI, UART remains one of the most common ways to bring up a board, print debug messages, interact with bootloaders, and control peripherals from a host computer. Its appeal is simple: it requires very little logic, very few pins, and almost no protocol overhead.
+</p>
+
+<p>
+This post follows the earlier <a href="axi_csr.html">Writing a CSR Block Using AXI-Lite</a> article in the same series. There, the focus was a generic control-and-status register block. Here, the same AXI-Lite ideas are applied to a concrete serial peripheral: a UART core and the small wrapper that turns it into a two-register device.
+</p>
+
+<p>
+This post covers two layers of the same design in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>. The first is <code>snix_uart_lite</code>, a compact UART core with clean byte-stream interfaces. The second is <code>snix_uart_axil_slave</code>, which wraps that core behind two AXI-Lite registers so that any AXI-Lite master &mdash; a CPU, a hardware DMA engine, or the UART bus master described in <a href="uart_axil_master.html">the next debug-console article</a> &mdash; can send and receive bytes without knowing anything about serial bit timing.
+</p>
+
+<h2 class="section-heading">Why UART still matters</h2>
+
+<p>
+UART is still everywhere because it solves a practical problem very well. Most FPGA boards expose a USB-to-UART bridge, which means that a host computer can talk to the FPGA using nothing more than a serial terminal or a short script. This makes UART ideal for early board bring-up, debug logging, simple command interfaces, boot and recovery paths, and CPU-less control of peripherals.
+</p>
+
+<p>
+Compared with other interfaces, UART is not fast, but it is extremely accessible. USB is standardized and high-throughput, but much more complex to implement. SPI is simple and efficient, but it requires a clock and a dedicated master-slave relationship. I2C uses only two wires and supports multiple devices, but it is slower and more protocol-heavy. Ethernet offers orders of magnitude more throughput and networking capability, but requires substantially more logic and system integration. UART is not a high-throughput data plane. It is a low-complexity control and visibility link, and that is exactly why it remains so useful.
+</p>
+
+<h2 class="section-heading">UART framing</h2>
+
+<p>
+The core in this article uses the common <strong>8N1</strong> format:
+</p>
+
+<ul>
+  <li>1 start bit</li>
+  <li>8 data bits</li>
+  <li>no parity bit</li>
+  <li>1 stop bit</li>
+</ul>
+
+<p>
+The line is idle-high. A transfer begins when the transmitter drives the line low for one bit period, indicating the start bit. The receiver then samples the incoming bits at the baud interval and reconstructs the byte. A frame therefore contains 10 transmitted bits for every 8-bit payload byte.
+</p>
+
+<script type="WaveDrom">
+{ "signal": [
+  { "name": "uart_tx",
+    "wave": "h.010101010101.." },
+  { "name": "uart_rx",
+    "wave": "h.0.1010101....." },
+  { "name": "bit",
+    "wave": "x.==========x..",
+    "data": ["ST","D0","D1","D2","D3","D4","D5","D6","D7","SP"] }
+],
+"head": { "text": "UART 8N1  ·  TX = 0x55  ·  RX = 0xAA  (LSB first)" },
+"foot": { "text": "10 bit periods total: 1 start + 8 data (LSB first) + 1 stop" },
+"config": { "hscale": 1 }
+}
+</script>
+<p>Figure (1): UART 8N1 frame on the wire. <code>uart_tx</code> carries <code>0x55</code> (<code>01010101</code>) and <code>uart_rx</code> carries <code>0xAA</code> (<code>10101010</code>). Data bits are shifted out LSB-first, so <code>D0</code> is the least significant bit.</p>
+
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Baud rate</th><th>Frame format</th><th>Bits per payload byte</th><th>Approximate payload throughput</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>115200</code></td><td><code>8N1</code></td><td><code>10</code></td><td><code>11520 bytes/s</code></td></tr>
+    <tr><td><code>1000000</code></td><td><code>8N1</code></td><td><code>10</code></td><td><code>100000 bytes/s</code></td></tr>
+  </tbody>
+</table>
+<p>Table (1): Effective UART payload throughput for common baud rates in 8N1 format.</p>
+
+<h2 class="section-heading">Baud rate and bit timing</h2>
+
+<p>
+UART timing is derived from the system clock. If the FPGA clock is <code>CLK_FREQ_HZ</code> and the desired UART baud rate is <code>BAUD_RATE</code>, then the number of clock cycles per transmitted bit is:
+</p>
+
+<pre><code>CLKS_PER_BIT = CLK_FREQ_HZ / BAUD_RATE</code></pre>
+
+<p>
+In <code>snix_uart_lite.sv</code>, this becomes:
+</p>
+
+<pre><code>localparam int CLKS_PER_BIT  = CLK_FREQ_HZ / BAUD_RATE;
+localparam int HALF_BIT_CLKS = (CLKS_PER_BIT &gt; 1) ? (CLKS_PER_BIT / 2) : 1;</code></pre>
+
+<p>
+<code>CLKS_PER_BIT</code> is used by the transmitter to hold each output bit for the correct duration. <code>HALF_BIT_CLKS</code> is used by the receiver to sample the first data bit in the middle of the bit period after detecting the start edge. For a <code>100 MHz</code> FPGA clock and a baud rate of <code>115200</code>, the divider is approximately <code>868</code>, so each UART bit lasts for about 868 clock cycles.
+</p>
+
+<h2 class="section-heading">Core architecture</h2>
+
+<p>
+The UART core is intentionally small. It has one transmitter FSM, one receiver FSM, one shallow TX byte FIFO, one shallow RX byte FIFO, and ready/valid byte interfaces on both sides. This makes the UART easy to compose with control-plane logic, since surrounding modules do not need to work at the bit level. They only send and receive bytes.
+</p>
+
+<pre><code>input  logic [7:0] tx_data,
+input  logic       tx_valid,
+output logic       tx_ready,
+
+output logic [7:0] rx_data,
+output logic       rx_valid,
+input  logic       rx_ready</code></pre>
+
+<a href="img/verilaxi/uart_lite.svg"><img src="img/verilaxi/uart_lite.svg" class="img-responsive center-block" alt="UART lite block diagram"></a>
+<p>Figure (2): <code>snix_uart_lite</code> architecture with byte-facing TX/RX interfaces, local FIFOs, and separate TX/RX bit-timing state machines.</p>
+
+<h2 class="section-heading">Why the FIFOs are there</h2>
+
+<p>
+Even a simple UART benefits from buffering. The transmitter sends one serial bit at a time, so a single byte takes many system clock cycles to leave the FPGA. Without buffering, upstream control logic would need to wait until the transmitter is idle before presenting every byte. A small TX FIFO decouples the producer from the serial line and allows a short burst of bytes to be queued quickly.
+</p>
+
+<p>
+The receiver has the opposite problem. It reconstructs bytes as they arrive from the serial line. Without buffering, downstream logic would have to consume each received byte immediately. A small RX FIFO allows the UART to absorb incoming bytes even if the consumer stalls briefly.
+</p>
+
+<p>
+The default FIFO depth is <code>8</code> bytes: deep enough to absorb short bursts, but still very easy to understand and verify. The UART stays self-contained rather than instantiating a general reusable FIFO primitive, which keeps the module boundary clean.
+</p>
+
+<h2 class="section-heading">The TX state machine</h2>
+
+<p>
+The transmitter FSM has four states: <code>TX_IDLE</code>, <code>TX_START</code>, <code>TX_DATA</code>, and <code>TX_STOP</code>. When idle, the line is high. If the TX FIFO is not empty, the core dequeues one byte, drives the start bit low, and begins the transmission.
+</p>
+
+<pre><code>typedef enum logic [1:0] {
+    TX_IDLE,
+    TX_START,
+    TX_DATA,
+    TX_STOP
+} tx_state_t;</code></pre>
+
+<ul>
+  <li>in <code>TX_IDLE</code>, wait for a byte in the TX FIFO</li>
+  <li>in <code>TX_START</code>, hold the start bit low for one bit interval</li>
+  <li>in <code>TX_DATA</code>, shift out the 8 data bits LSB-first</li>
+  <li>in <code>TX_STOP</code>, hold the line high for one stop bit interval</li>
+</ul>
+
+<pre><code>if (!tx_fifo_empty) begin
+    tx_fifo_rd_en &lt;= 1'b1;
+    tx_shift_reg  &lt;= tx_fifo_data;
+    tx_baud_cnt   &lt;= CLKS_PER_BIT - 1;
+    tx_bit_idx    &lt;= '0;
+    tx_busy       &lt;= 1'b1;
+    tx_state      &lt;= TX_START;
+    uart_tx       &lt;= 1'b0;
+end</code></pre>
+
+<a href="img/verilaxi/uart_tx_fsm.svg"><img src="img/verilaxi/uart_tx_fsm.svg" class="img-responsive center-block" alt="UART TX FSM"></a>
+<p>Figure (3): UART transmit state machine. The transmitter idles high, emits a start bit, shifts out eight data bits LSB-first, then drives the stop bit before returning to idle.</p>
+
+<h2 class="section-heading">The RX state machine</h2>
+
+<p>
+The receiver FSM also has four states: <code>RX_IDLE</code>, <code>RX_START</code>, <code>RX_DATA</code>, and <code>RX_STOP</code>. In the idle state, the receiver waits for the line to go low. That falling edge indicates the beginning of a start bit. Instead of sampling immediately, the receiver waits for half a bit period so that it samples near the center of the start bit. This improves robustness against edge timing uncertainty.
+</p>
+
+<pre><code>typedef enum logic [1:0] {
+    RX_IDLE,
+    RX_START,
+    RX_DATA,
+    RX_STOP
+} rx_state_t;</code></pre>
+
+<ul>
+  <li>in <code>RX_IDLE</code>, watch for <code>uart_rx == 0</code></li>
+  <li>in <code>RX_START</code>, wait <code>HALF_BIT_CLKS</code> and confirm the start bit is still low</li>
+  <li>in <code>RX_DATA</code>, sample one data bit every <code>CLKS_PER_BIT</code></li>
+  <li>in <code>RX_STOP</code>, sample the stop bit and push the byte into the RX FIFO</li>
+</ul>
+
+<a href="img/verilaxi/uart_rx_fsm.svg"><img src="img/verilaxi/uart_rx_fsm.svg" class="img-responsive center-block" alt="UART RX FSM"></a>
+<p>Figure (4): UART receive state machine. After detecting the falling edge of the start bit, the receiver waits half a bit period, samples each data bit at the baud interval, then validates the stop bit before pushing the byte into the RX FIFO.</p>
+
+<h2 class="section-heading">UART core verification</h2>
+
+<p>
+The UART core is verified in <code>test_uart_lite.sv</code>. The test exercises loopback behavior by sending a short sequence of bytes and checking that the receiver reconstructs the same values:
+</p>
+
+<pre><code>[UART][TX ] byte 0 data=0x55
+[UART][TX ] byte 1 data=0xa3
+[UART][TX ] byte 2 data=0x00
+[UART][TX ] byte 3 data=0xff
+[UART][RX ] byte 0 data=0x55
+[UART][RX ] byte 1 data=0xa3
+[UART][RX ] byte 2 data=0x00
+[UART][RX ] byte 3 data=0xff</code></pre>
+
+<pre><code>make run TESTNAME=uart_lite</code></pre>
+
+<h2 class="section-heading">From serial bytes to a bus peripheral</h2>
+
+<p>
+A standalone UART core with ready/valid byte interfaces is useful, but it is not what a CPU sees. A processor running software expects a memory-mapped register at a fixed address. A DMA engine or AXI-Lite bus master expects standard handshake channels, not a byte-stream handshake. The gap between those two worlds is the job of <code>snix_uart_axil_slave</code>.
+</p>
+
+<p>
+The wrapper adds almost no logic. It places three pipeline register slices on the incoming AXI channels, builds a single <code>write_ready</code> expression that fuses address validity, data validity, response-channel availability, and UART back-pressure into one signal, and routes the DATA and STATUS addresses to the UART byte interface. Everything below the register boundary &mdash; bit timing, framing, FIFO management &mdash; stays exactly as described above. The AXI-Lite master never has to know that UART even exists.
+</p>
+
+<a href="img/verilaxi/uart_stack.svg"><img src="img/verilaxi/uart_stack.svg" class="img-responsive center-block" alt="UART core and AXI-Lite wrapper layering"></a>
+<p>Figure (5): The merged UART stack. A CPU or any AXI-Lite master sees only two registers in <code>snix_uart_axil_slave</code>, while <code>snix_uart_lite</code> keeps the UART framing, baud timing, and TX/RX state machines local to the serial layer.</p>
+
+<h2 class="section-heading">Wrapping the byte stream in a register interface</h2>
+
+<p>
+<code>snix_uart_axil_slave</code> exposes the UART core behind two AXI-Lite registers. Any AXI-Lite master &mdash; a MicroBlaze, a RISC-V soft-core, a hardware DMA engine, or the UART-to-AXI-Lite master from the <a href="uart_axil_master.html">companion post</a> &mdash; can write a byte to the DATA register at offset <code>0x00</code> and read the peripheral status from the STATUS register at offset <code>0x04</code>. No knowledge of UART bit timing or handshake sequencing is required from the master. Write a word, the UART sends the byte.
+</p>
+
+<p>
+This is the standard pattern for integrating low-speed peripherals into processor-based SoCs. The AXI-Lite slave module is the glue layer that turns a byte-oriented device into a register-oriented one.
+</p>
+
+<h2 class="section-heading">Register map</h2>
+
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Offset</th>
+      <th>Name</th>
+      <th>Access</th>
+      <th>Bits</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>0x00</code></td>
+      <td><code>DATA</code></td>
+      <td>Write</td>
+      <td>[7:0]</td>
+      <td>Enqueue one byte into the TX FIFO. The write stalls (WREADY de-asserted) if the TX FIFO is full.</td>
+    </tr>
+    <tr>
+      <td><code>0x00</code></td>
+      <td><code>DATA</code></td>
+      <td>Read</td>
+      <td>[7:0]</td>
+      <td>Dequeue one byte from the RX FIFO. Software must check STATUS[1] before reading; the value is undefined if the RX FIFO is empty.</td>
+    </tr>
+    <tr>
+      <td><code>0x04</code></td>
+      <td><code>STATUS</code></td>
+      <td>Read-only</td>
+      <td>[0] <code>tx_ready</code></td>
+      <td>1 when the TX FIFO has room for at least one more byte.</td>
+    </tr>
+    <tr>
+      <td><code>0x04</code></td>
+      <td><code>STATUS</code></td>
+      <td>Read-only</td>
+      <td>[1] <code>rx_valid</code></td>
+      <td>1 when at least one received byte is waiting in the RX FIFO.</td>
+    </tr>
+    <tr>
+      <td><code>0x04</code></td>
+      <td><code>STATUS</code></td>
+      <td>Read-only</td>
+      <td>[2] <code>tx_busy</code></td>
+      <td>1 while the UART transmitter is actively shifting bits onto the wire.</td>
+    </tr>
+    <tr>
+      <td><code>0x04</code></td>
+      <td><code>STATUS</code></td>
+      <td>Read-only</td>
+      <td>[3] <code>rx_busy</code></td>
+      <td>1 while the UART receiver is actively sampling bits from the wire.</td>
+    </tr>
+  </tbody>
+</table>
+<p>Table (2): <code>snix_uart_axil_slave</code> register map. Bits [31:8] of DATA and [31:4] of STATUS always read as zero.</p>
+
+<h2 class="section-heading">Slave architecture</h2>
+
+<a href="img/verilaxi/snix_uart_axil_slave.svg"><img src="img/verilaxi/snix_uart_axil_slave.svg" class="img-responsive center-block" alt="snix_uart_axil_slave block diagram"></a>
+<p>Figure (6): <code>snix_uart_axil_slave</code> architecture. Three register slices pipeline the incoming AXI-Lite AW, W, and AR channels. The <code>write_ready</code> and <code>read_ready</code> expressions gate the handshakes. All UART bit timing and buffering is handled by <code>snix_uart_lite</code> internally.</p>
+
+<p>
+If you read the earlier <a href="axi_csr.html">Writing a CSR Block Using AXI-Lite</a> post, this wrapper is the same idea in a smaller and more concrete setting: an AXI-Lite slave absorbs bus timing and response rules so the rest of the design can focus on the actual peripheral behavior. Here the peripheral just happens to be a UART. Three instances of <code>snix_register_slice</code> sit on the AW, W, and AR channels so the wrapper stays AXI-Lite compliant while presenting a tiny two-register UART peripheral. The useful architectural takeaway is that software only sees <code>DATA</code> and <code>STATUS</code>; the deeper parser-and-control-plane discussion moves into <a href="uart_axil_master.html">the next debug-console article</a>.
+</p>
+
+
+<h2 class="section-heading">STATUS register</h2>
+
+<p>
+The STATUS register at offset <code>0x04</code> is assembled directly from the UART core signals:
+</p>
+
+<ul>
+  <li><strong>STATUS[0] tx_ready</strong>: when 1, the TX FIFO has at least one free slot. A write to DATA will complete without stalling.</li>
+  <li><strong>STATUS[1] rx_valid</strong>: when 1, at least one received byte is waiting in the RX FIFO. Software must poll this bit before reading DATA. If DATA is read when <code>rx_valid</code> is 0, the returned value is undefined.</li>
+  <li><strong>STATUS[2] tx_busy</strong>: the transmitter is actively shifting a byte onto the wire. Software that needs to know when the last bit has left the FPGA pin should poll this bit after writing all bytes.</li>
+  <li><strong>STATUS[3] rx_busy</strong>: the receiver is actively sampling an incoming byte. Rarely polled in normal software but useful in diagnostics.</li>
+</ul>
+
+<h2 class="section-heading">AXI-Lite write transaction</h2>
+
+<p>
+The WaveDrom diagram below shows one representative AXI-Lite write to the DATA register. The register slices insert a pipeline stage on the incoming channels, so READY is observed after the address and data have been captured rather than in the same cycle as the original VALID assertion.
+</p>
+
+<script type="WaveDrom">
+{ "signal": [
+  { "name": "AWVALID", "wave": "01....0...." },
+  { "name": "AWREADY", "wave": "0.1...0...." },
+  { "name": "WVALID",  "wave": "01....0...." },
+  { "name": "WREADY",  "wave": "0..10......" },
+  {},
+  { "name": "BVALID",  "wave": "0....1.0..." },
+  { "name": "BREADY",  "wave": "0....1.0..." }
+],
+"head": { "text": "AXI-Lite write to DATA register  ·  one-cycle register-slice pipeline" },
+"config": { "hscale": 1 }
+}
+</script>
+<p>Figure (7): Representative AXI-Lite write handshake. The slices move the AW and W handshakes behind a registered stage, so READY appears after the request has been captured. The exact number of cycles spent with <code>AWVALID</code>, <code>AWREADY</code>, <code>WREADY</code>, or <code>BVALID</code> high depends on when the master drops VALID and on whether <code>uart_tx_ready</code> is already asserted, but the ordering shown here is the key point: address and data are captured first, then the write response is returned once the byte is accepted.</p>
+
+<h2 class="section-heading">Slave verification</h2>
+
+<p>
+The testbench for <code>snix_uart_axil_slave</code> uses an accelerated clock configuration: <code>CLK_FREQ_HZ=10_000_000</code> and <code>BAUD_RATE=1_000_000</code>, giving exactly 10 clock cycles per UART bit. The testbench connects <code>uart_tx</code> directly to <code>uart_rx</code>, forming a loopback path. Every byte written to DATA is transmitted over the simulated serial wire and received back into the RX FIFO.
+</p>
+
+<p>
+The test procedure:
+</p>
+
+<ol>
+  <li>Write byte <code>0x55</code> to DATA at offset <code>0x00</code>.</li>
+  <li>Write byte <code>0xA3</code> to DATA at offset <code>0x00</code>.</li>
+  <li>Poll STATUS at offset <code>0x04</code> until bit 1 (<code>rx_valid</code>) is set.</li>
+  <li>Read DATA twice and compare with <code>0x55</code> and <code>0xA3</code>.</li>
+  <li>Read STATUS and verify bit 1 is now 0 (RX FIFO empty).</li>
+</ol>
+
+<pre><code>m.write(32'h0, 32'h00000055);   // write byte 0x55 to DATA
+m.write(32'h0, 32'h000000A3);   // write byte 0xA3 to DATA
+
+// poll STATUS[1] (rx_valid) until set
+while (timeout_ctr &lt; 2000) begin
+    m.read(32'h4, rd_data);
+    if (rd_data[1]) break;
+end
+
+m.read(32'h0, rd_data);  // read first byte  → expect 0x55
+m.read(32'h0, rd_data);  // read second byte → expect 0xA3
+m.read(32'h4, rd_data);  // check STATUS[1] == 0 (FIFO empty)</code></pre>
+
+<pre><code>[UART-AXIL][RD ] data=0x55
+[UART-AXIL][RD ] data=0xa3
+test_uart_axil_slave: PASS</code></pre>
+
+<pre><code>make run TESTNAME=uart_axil_slave</code></pre>
+
+<h2 class="section-heading">Summary</h2>
+
+<p>
+UART remains one of the most practical interfaces in digital design because it provides a simple bridge between the FPGA and the outside world with minimal logic and no protocol overhead. <code>snix_uart_lite</code> implements that link as a compact 8N1 core: one transmitter FSM, one receiver FSM, small TX and RX byte FIFOs, and a clean ready/valid interface to the surrounding logic.
+</p>
+
+<p>
+<code>snix_uart_axil_slave</code> lifts the byte stream into the AXI-Lite register world. Three register slices on the AW, W, and AR channels satisfy the AXI-Lite requirement that READY must not depend combinatorially on VALID. The fused <code>write_ready</code> expression combines address validity, data validity, B-channel availability, and UART TX back-pressure into a single signal that drives both the AXI handshake and the UART enqueue in one step. The result is a peripheral any AXI-Lite master can use without knowing anything about UART timing: write a word to <code>0x00</code>, the UART sends the byte; poll <code>0x04</code> until bit 1 is set, read <code>0x00</code>, the received byte comes back.
+</p>
+
+<p>
+Read next:<br>
+<a href="uart_axil_master.html">A CPU-less AXI-Lite Debug Console: Parser, GPIO, and a Web GUI</a> &mdash; how ASCII commands over the same serial cable drive AXI-Lite register reads and writes without any processor inside the FPGA, and how a GPIO peripheral is brought up and validated using this infrastructure.<br>
+Implementation pointers in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>: <code>rtl/uart/snix_uart_lite.sv</code>, <code>rtl/uart/snix_uart_axil_slave.sv</code>, <code>tb/tests/uart/test_uart_lite.sv</code>, <code>tb/tests/uart/test_uart_axil_slave.sv</code>.
+</p>
+
+<p>References:<br>
+[1] Jan Axelson. Serial Port Complete. Lakeview Research, 2007.<br>
+[2] ARM. AMBA AXI and ACE Protocol Specification. 2011.<br>
+[3] <a href="axi_csr.html">Writing a CSR Block Using AXI-Lite - sistenix.com</a><br>
+[4] <a href="uart_axil_master.html">A CPU-less AXI-Lite Debug Console: Parser, GPIO, and a Web GUI - sistenix.com</a>
+</p>
+
+                    <hr>
+
+                    <p>Also available in <a href="https://github.com/nelsoncsc/verilaxi">GitHub</a>.</p>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelson@sistenix.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/jquery.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/clean-blog.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wavedrom/3.1.0/skins/default.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wavedrom/3.1.0/wavedrom.min.js"></script>
+    <script>WaveDrom.ProcessAll();</script>
+
+</body>
+
+</html>

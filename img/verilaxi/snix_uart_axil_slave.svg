@@ -1,0 +1,542 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="820"
+   height="340"
+   viewBox="0 0 820 340"
+   version="1.1"
+   id="svg42"
+   sodipodi:docname="snix_uart_axil_slave.svg"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview42"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.2235294"
+     inkscape:cx="410.69711"
+     inkscape:cy="167.95673"
+     inkscape:window-width="1512"
+     inkscape:window-height="854"
+     inkscape:window-x="0"
+     inkscape:window-y="38"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg42" />
+  <defs
+     id="defs2">
+    <marker
+       id="arr"
+       markerWidth="8"
+       markerHeight="8"
+       refX="7"
+       refY="3"
+       orient="auto">
+      <path
+         d="M0,0 L0,6 L8,3 z"
+         fill="#444"
+         id="path1" />
+    </marker>
+    <marker
+       id="arr-b"
+       markerWidth="8"
+       markerHeight="8"
+       refX="7"
+       refY="3"
+       orient="auto">
+      <path
+         d="M0,0 L0,6 L8,3 z"
+         fill="#666"
+         id="path2" />
+    </marker>
+  </defs>
+  <!-- Background -->
+  <rect
+     width="820"
+     height="340"
+     fill="white"
+     id="rect2" />
+  <!-- Outer module border (dashed) -->
+  <rect
+     x="8"
+     y="8"
+     width="804"
+     height="324"
+     rx="10"
+     fill="#fafafa"
+     stroke="#555"
+     stroke-width="1.5"
+     stroke-dasharray="7,4"
+     id="rect3" />
+  <text
+     x="412"
+     y="28"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="14"
+     font-weight="bold"
+     fill="#222"
+     id="text3">
+    snix_uart_axil_slave
+  </text>
+  <!-- ── AXI-Lite channel labels (left edge) ── -->
+  <text
+     x="22"
+     y="82"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     id="text4">AW →</text>
+  <text
+     x="22"
+     y="152"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     id="text5">W  →</text>
+  <text
+     x="22"
+     y="206"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     id="text6">← B</text>
+  <text
+     x="22"
+     y="256"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     id="text7">AR →</text>
+  <text
+     x="22"
+     y="302"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#555"
+     id="text8">← R</text>
+  <!-- ── Register slices ── -->
+  <!-- AW Slice -->
+  <rect
+     x="72"
+     y="58"
+     width="108"
+     height="46"
+     rx="5"
+     fill="white"
+     stroke="#1565c0"
+     stroke-width="1.5"
+     id="rect8" />
+  <text
+     x="126"
+     y="76"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="11"
+     font-weight="bold"
+     fill="#1565c0"
+     id="text9">AW Slice</text>
+  <text
+     x="126"
+     y="92"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#555"
+     id="text10">AWADDR pipeline</text>
+  <!-- W Slice -->
+  <rect
+     x="72"
+     y="128"
+     width="108"
+     height="46"
+     rx="5"
+     fill="white"
+     stroke="#1565c0"
+     stroke-width="1.5"
+     id="rect10" />
+  <text
+     x="126"
+     y="146"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="11"
+     font-weight="bold"
+     fill="#1565c0"
+     id="text11">W Slice</text>
+  <text
+     x="126"
+     y="162"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#555"
+     id="text12">WDATA / WSTRB</text>
+  <!-- AR Slice -->
+  <rect
+     x="72"
+     y="232"
+     width="108"
+     height="46"
+     rx="5"
+     fill="white"
+     stroke="#1565c0"
+     stroke-width="1.5"
+     id="rect12" />
+  <text
+     x="126"
+     y="250"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="11"
+     font-weight="bold"
+     fill="#1565c0"
+     id="text13">AR Slice</text>
+  <text
+     x="126"
+     y="266"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#555"
+     id="text14">ARADDR pipeline</text>
+  <!-- ── write_ready / read_ready logic ── -->
+  <rect
+     x="224"
+     y="80"
+     width="148"
+     height="106"
+     rx="5"
+     fill="#fff8e1"
+     stroke="#e65100"
+     stroke-width="1.5"
+     id="rect14" />
+  <text
+     x="298"
+     y="100"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="11"
+     font-weight="bold"
+     fill="#e65100"
+     id="text15">write_ready</text>
+  <text
+     x="298"
+     y="116"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#555"
+     id="text16">AW_valid</text>
+  <text
+     x="298"
+     y="130"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#555"
+     id="text17">AND W valid</text>
+  <text
+     x="298"
+     y="144"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#555"
+     id="text18">AND no pending B response</text>
+  <text
+     x="298"
+     y="158"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#555"
+     id="text19">AND uart_tx_ready</text>
+  <text
+     x="298"
+     y="176"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text20">(WSTRB[0] gates TX)</text>
+  <rect
+     x="224.02541"
+     y="226.02541"
+     width="158.35182"
+     height="51.949184"
+     rx="5.3497233"
+     fill="#fff8e1"
+     stroke="#e65100"
+     stroke-width="1.55081"
+     id="rect20" />
+  <text
+     x="298"
+     y="248"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="11"
+     font-weight="bold"
+     fill="#e65100"
+     id="text21">read_ready</text>
+  <text
+     x="304"
+     y="264"
+     text-anchor="middle"
+     font-family="Helvetica, Arial, sans-serif"
+     font-size="9px"
+     fill="#555555"
+     id="text22">AR valid AND no pending R response</text>
+  <!-- ── snix_uart_lite ── -->
+  <rect
+     x="424"
+     y="52"
+     width="180"
+     height="222"
+     rx="7"
+     fill="#e8f5e9"
+     stroke="#2e7d32"
+     stroke-width="2"
+     id="rect22" />
+  <text
+     x="514"
+     y="74"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="12"
+     font-weight="bold"
+     fill="#2e7d32"
+     id="text23">snix_uart_lite</text>
+  <rect
+     x="440"
+     y="84"
+     width="148"
+     height="34"
+     rx="4"
+     fill="white"
+     stroke="#2e7d32"
+     stroke-width="1"
+     id="rect23" />
+  <text
+     x="514"
+     y="106"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#333"
+     id="text24">TX FIFO  →  TX FSM</text>
+  <rect
+     x="440"
+     y="128"
+     width="148"
+     height="34"
+     rx="4"
+     fill="white"
+     stroke="#2e7d32"
+     stroke-width="1"
+     id="rect24" />
+  <text
+     x="514"
+     y="150"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="10"
+     fill="#333"
+     id="text25">RX FSM  →  RX FIFO</text>
+  <rect
+     x="440"
+     y="172"
+     width="148"
+     height="34"
+     rx="4"
+     fill="white"
+     stroke="#2e7d32"
+     stroke-width="1"
+     id="rect25" />
+  <text
+     x="514"
+     y="188"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#555"
+     id="text26">tx_ready · rx_valid</text>
+  <text
+     x="514"
+     y="200"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#555"
+     id="text27">tx_busy  · rx_busy</text>
+  <text
+     x="514"
+     y="240"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text28">(STATUS register source)</text>
+  <text
+     x="514"
+     y="256"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#777"
+     id="text29">FIFO depth = FIFO_DEPTH</text>
+  <!-- ── UART pins (right) ── -->
+  <text
+     x="618"
+     y="106"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="11"
+     fill="#222"
+     id="text30">→  uart_tx</text>
+  <text
+     x="618"
+     y="152"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="11"
+     fill="#222"
+     id="text31">←  uart_rx</text>
+  <!-- ── B response / R data outputs ── -->
+  <text
+     x="232"
+     y="60"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#888"
+     id="text32">← BVALID/BRESP</text>
+  <text
+     x="232"
+     y="310"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#888"
+     id="text33">← RVALID/RDATA</text>
+  <!-- ── Arrows ── -->
+  <!-- AXI → slices -->
+  <line
+     x1="66"
+     y1="80"
+     x2="72"
+     y2="80"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line33" />
+  <line
+     x1="66"
+     y1="150"
+     x2="72"
+     y2="150"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line34" />
+  <line
+     x1="66"
+     y1="254"
+     x2="72"
+     y2="254"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line35" />
+  <!-- AW+W slices → write_ready -->
+  <line
+     x1="180"
+     y1="82"
+     x2="224"
+     y2="108"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line36" />
+  <line
+     x1="180"
+     y1="152"
+     x2="224"
+     y2="128"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line37" />
+  <!-- AR slice → read_ready -->
+  <line
+     x1="180"
+     y1="254"
+     x2="224"
+     y2="252"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line38" />
+  <!-- write_ready → uart_lite (tx_data/tx_valid) -->
+  <line
+     x1="372"
+     y1="120"
+     x2="424"
+     y2="102"
+     stroke="#444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line39" />
+  <!-- read_ready → uart_lite (rx_ready) -->
+  <line
+     x1="382.91742"
+     y1="248.01849"
+     x2="424.06314"
+     y2="147.90596"
+     stroke="#444444"
+     stroke-width="1.2"
+     marker-end="url(#arr)"
+     id="line40" />
+  <!-- uart_lite STATUS → write_ready (back) -->
+  <line
+     x1="424"
+     y1="186"
+     x2="372"
+     y2="172"
+     stroke="#888"
+     stroke-width="1"
+     stroke-dasharray="4,3"
+     marker-end="url(#arr-b)"
+     id="line41" />
+  <!-- BVALID back to AXI left -->
+  <polyline
+     points="424,70 210,70 210,50 66,50"
+     fill="none"
+     stroke="#888"
+     stroke-width="1"
+     stroke-dasharray="4,3"
+     marker-end="url(#arr-b)"
+     id="polyline41" />
+  <!-- RDATA back to AXI left -->
+  <polyline
+     points="424,200 210,200 210,308 66,308"
+     fill="none"
+     stroke="#888"
+     stroke-width="1"
+     stroke-dasharray="4,3"
+     marker-end="url(#arr-b)"
+     id="polyline42" />
+  <!-- Parameter note -->
+  <text
+     x="412"
+     y="328"
+     text-anchor="middle"
+     font-family="Helvetica,Arial,sans-serif"
+     font-size="9"
+     fill="#999"
+     id="text42">
+    Parameters: DATA_WIDTH · ADDR_WIDTH · CLK_FREQ_HZ · BAUD_RATE · FIFO_DEPTH
+  </text>
+</svg>
