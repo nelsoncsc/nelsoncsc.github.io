@@ -20,9 +20,9 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="1.5084945"
-     inkscape:cx="459.72989"
-     inkscape:cy="192.57611"
+     inkscape:zoom="3.016989"
+     inkscape:cx="32.316989"
+     inkscape:cy="221.24708"
      inkscape:window-width="1512"
      inkscape:window-height="854"
      inkscape:window-x="0"
@@ -289,24 +289,24 @@
      fill="#333333"
      id="text18">PARSE_EOL → fires AXI</text>
   <text
-     x="372"
+     x="326"
      y="208"
      text-anchor="middle"
-     font-family="Helvetica,Arial,sans-serif"
-     font-size="9"
-     fill="#777"
+     font-family="Helvetica, Arial, sans-serif"
+     font-size="9px"
+     fill="#777777"
      id="text19">uart_rx_ready gated by</text>
   <text
-     x="372"
+     x="310"
      y="220"
      text-anchor="middle"
-     font-family="Helvetica,Arial,sans-serif"
-     font-size="9"
-     fill="#777"
+     font-family="Helvetica, Arial, sans-serif"
+     font-size="9px"
+     fill="#777777"
      id="text20">axil_state==IDLE ∧ ¬resp</text>
   <!-- ── AXI-Lite FSM ── -->
   <rect
-     x="288"
+     x="276"
      y="224"
      width="182"
      height="128"
@@ -316,65 +316,65 @@
      stroke-width="2"
      id="rect20" />
   <text
-     x="379"
+     x="365"
      y="246"
      text-anchor="middle"
-     font-family="Helvetica,Arial,sans-serif"
-     font-size="12"
+     font-family="Helvetica, Arial, sans-serif"
+     font-size="12px"
      font-weight="bold"
      fill="#c62828"
      id="text21">AXI-Lite FSM</text>
   <rect
-     x="309"
-     y="254"
+     x="297"
+     y="256"
      width="140"
      height="24"
      rx="3"
-     fill="white"
+     fill="#ffffff"
      stroke="#c62828"
      stroke-width="1"
      id="rect21" />
   <text
-     x="379"
+     x="373"
      y="270"
      text-anchor="middle"
-     font-family="Helvetica,Arial,sans-serif"
-     font-size="9"
-     fill="#333"
+     font-family="Helvetica, Arial, sans-serif"
+     font-size="9px"
+     fill="#333333"
      id="text22">WR: AW → W → B → IDLE</text>
   <rect
-     x="309"
-     y="284"
+     x="297"
+     y="286"
      width="140"
      height="24"
      rx="3"
-     fill="white"
+     fill="#ffffff"
      stroke="#c62828"
      stroke-width="1"
      id="rect22" />
   <text
-     x="379"
+     x="359"
      y="300"
      text-anchor="middle"
-     font-family="Helvetica,Arial,sans-serif"
-     font-size="9"
-     fill="#333"
+     font-family="Helvetica, Arial, sans-serif"
+     font-size="9px"
+     fill="#333333"
      id="text23">RD: AR → R → IDLE</text>
   <text
-     x="379"
+     x="369"
      y="326"
      text-anchor="middle"
-     font-family="Helvetica,Arial,sans-serif"
-     font-size="9"
-     fill="#777"
+     font-family="Helvetica, Arial, sans-serif"
+     font-size="9px"
+     fill="#777777"
      id="text24">drives m_axil_* outputs</text>
   <text
-     x="379"
+     x="369"
      y="340"
      text-anchor="middle"
-     font-family="Helvetica,Arial,sans-serif"
-     font-size="9"
-     fill="#777"
+     font-family="Helvetica, Arial, sans-serif"
+     font-size="9px"
+     fill="#777777"
      id="text25">latches rdata on R handshake</text>
   <!-- ── RESP MUX ── -->
   <rect
@@ -525,11 +525,11 @@
      id="line37" />
   <!-- uart_lite TX → uart_tx -->
   <line
-     x1="92"
-     y1="194"
-     x2="80"
-     y2="242"
-     stroke="#444"
+     x1="91.97422"
+     y1="194.25859"
+     x2="71.679955"
+     y2="237.20821"
+     stroke="#444444"
      stroke-width="1.2"
      marker-end="url(#arr)"
      id="line38" />
@@ -545,32 +545,32 @@
      id="line39" />
   <!-- Parse FSM → AXI FSM (fires on EOL) -->
   <line
-     x1="379"
-     y1="198"
-     x2="379"
-     y2="224"
-     stroke="#444"
-     stroke-width="1.2"
+     x1="379.6629"
+     y1="192.67418"
+     x2="379.6629"
+     y2="223.10114"
+     stroke="#444444"
+     stroke-width="1.29815"
      marker-end="url(#arr)"
      id="line40" />
   <!-- AXI FSM → AXI master output -->
   <line
-     x1="470"
-     y1="288"
-     x2="770"
-     y2="288"
-     stroke="#444"
-     stroke-width="1.2"
+     x1="458.06757"
+     y1="294"
+     x2="769.95245"
+     y2="294"
+     stroke="#444444"
+     stroke-width="1.22354"
      marker-end="url(#arr)"
      id="line41" />
   <!-- AXI FSM → RESP MUX (triggers resp_active) -->
   <line
-     x1="470"
-     y1="258"
-     x2="508"
-     y2="228"
-     stroke="#444"
-     stroke-width="1.2"
+     x1="457.5162"
+     y1="267.7963"
+     x2="508.36975"
+     y2="229.55315"
+     stroke="#444444"
+     stroke-width="1.1921"
      marker-end="url(#arr)"
      id="line42" />
   <!-- RESP MUX → uart_lite TX -->
@@ -585,11 +585,12 @@
   <polyline
      points="770,270 748,270 748,300 500,300 500,280 470,280"
      fill="none"
-     stroke="#888"
+     stroke="#888888"
      stroke-width="1"
-     stroke-dasharray="4,3"
+     stroke-dasharray="4, 3"
      marker-end="url(#arr-b)"
-     id="polyline43" />
+     id="polyline43"
+     transform="matrix(1.0375041,0,0,0.99939102,-28.868578,0.17355819)" />
   <!-- Parameter note -->
   <text
      x="460"
