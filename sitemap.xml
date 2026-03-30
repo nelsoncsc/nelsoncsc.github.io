@@ -41,11 +41,6 @@
   <priority>0.88</priority>
 </url>
 <url>
-  <loc>https://sistenix.com/axil_gpio.html</loc>
-  <lastmod>2026-03-30T12:00:00+00:00</lastmod>
-  <priority>0.86</priority>
-</url>
-<url>
   <loc>https://sistenix.com/axi_sva.html</loc>
   <lastmod>2026-03-21T16:23:12+00:00</lastmod>
   <priority>0.88</priority>
@@ -74,11 +69,6 @@
   <loc>https://sistenix.com/uart_axil_master.html</loc>
   <lastmod>2026-03-30T12:00:00+00:00</lastmod>
   <priority>0.90</priority>
-</url>
-<url>
-  <loc>https://sistenix.com/uart_axil_slave.html</loc>
-  <lastmod>2026-03-30T12:00:00+00:00</lastmod>
-  <priority>0.84</priority>
 </url>
 <url>
   <loc>https://sistenix.com/fft.html</loc>
