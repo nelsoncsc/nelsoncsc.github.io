@@ -134,80 +134,22 @@ simply says: if VALID is high and READY is low on this clock edge, then VALID mu
 Another common operator is <code>|-&gt;</code>, which is used for same-cycle implications. In protocol checkers it is useful for statements like "if a beat is accepted with WLAST high, the internal beat counter must already be at the last beat." The key point is that SVA is not magic syntax to memorise in isolation; it is a compact way of writing temporal protocol rules that designers already describe informally.
 </p>
 
-<h2 class="section-heading">One important caveat: Verilator post-NBA evaluation</h2>
+<h2 class="section-heading">Strict sampling and race-free BFMs</h2>
 
 <p>
-Before showing the properties, there is one Verilator-specific behaviour worth understanding upfront, because it affects how every VALID stability property must be written.
-</p>
-
-<table class="table table-bordered">
-  <thead>
-    <tr><th>Region</th><th>What happens</th><th>Why it matters here</th></tr>
-  </thead>
-  <tbody>
-    <tr><td><code>Preponed</code></td><td>Assertion sampling point defined by the SystemVerilog language model</td><td>The ideal place to observe handshake intent before sequential updates react to the same edge</td></tr>
-    <tr><td><code>Active</code></td><td>Procedural blocks and combinational logic evaluate using values visible at the clock edge</td><td>This is where an AXI handshake is conceptually decided from <code>VALID &amp;&amp; READY</code></td></tr>
-    <tr><td><code>NBA</code></td><td>Non-blocking assignments (<code>&lt;=</code>) from <code>always_ff</code> take effect</td><td>FIFO full flags, counters, and registered READY signals may update because the beat was just accepted</td></tr>
-    <tr><td><code>Post-NBA</code></td><td>The design is observed after those sequential updates have settled</td><td>A checker can see <code>TREADY=0</code> on the same edge where the transfer was actually accepted</td></tr>
-  </tbody>
-</table>
-<p>Table (1): Simulation regions relevant to the Verilator assertion caveat</p>
-
-<p>
-Verilator evaluates <code>assert property</code> consequents in the post-NBA region — after <code>always_ff</code> blocks have settled — rather than in the preponed region mandated by the SystemVerilog specification. This means the checker sees signal values that have already been updated by the current clock edge. If a master correctly deasserts VALID one cycle after a handshake completes, the naive property sees <code>valid=0</code> at that edge and fires a false positive — even though the behaviour is correct.
+Verilaxi is validated with Verilator 5.048 and uses the strict SystemVerilog interpretation of AXI stability. Concurrent assertions sample the channel at the clock edge. If <code>VALID=1</code> and <code>READY=0</code> are sampled, no handshake occurred on that edge; the source must keep VALID asserted and hold the payload unchanged through the next edge.
 </p>
 
 <p>
-It helps to picture one clock edge as a sequence of simulation regions rather than a single instant. In the <em>active</em> region, the current values of VALID and READY determine whether a handshake happened. In the <em>non-blocking assignment</em> (NBA) region, the flops update: FIFOs may become full, internal state advances, and READY may drop as a consequence of the just-accepted beat. In the <em>post-NBA</em> observation point, the checker sees those updated values. So a transfer can legally complete in the active region, yet by the time the assertion samples the same edge, READY already looks low because the design has reacted to that transfer.
+The original Verilator 5.046 environment used <code>$fell(ready)</code> antecedent guards and <code>|| ready</code> consequent escapes to work around observed coroutine and active-edge scheduling behaviour. Those guards explain the older checker implementation, but they also weaken the AXI rule. After moving the BFMs to race-free edge timing, Verilator 5.048 runs the strict properties without the 5.046 workarounds.
 </p>
 
 <p>
-For this discussion, the most useful mental model is not the full scheduler diagram but a short sequence of steps:
-</p>
-
-<ol>
-  <li><strong>Preponed</strong> — concurrent assertions conceptually sample signals for this time slot before design updates react to the edge.</li>
-  <li><strong>Active</strong> — procedural code runs; blocking assignments take effect immediately; non-blocking assignments are evaluated and scheduled; an AXI handshake is logically determined from the values visible at the edge.</li>
-  <li><strong>NBA</strong> — updates from <code>&lt;=</code> take effect; FIFO full flags, counters, and registered READY signals may change because a beat was just accepted.</li>
-  <li><strong>Observed / post-NBA view</strong> — the checker sees the design after those sequential updates have landed.</li>
-</ol>
-
-<p>
-That distinction between <em>"what happened at the edge"</em> and <em>"what the design looks like after reacting to the edge"</em> is the whole heart of the caveat. Assertions want to reason about the first view. In this Verilator-specific corner case, the checker effectively sees more of the second view.
+This remains true if READY becomes high on the next edge. That next edge is the eventual handshake, so VALID and the payload must still describe the stalled transfer at that sampling point. Consequently, the checker does not add <code>!$fell(ready)</code> to the antecedent and does not add <code>|| ready</code> to the consequent. Either escape can hide a real protocol violation.
 </p>
 
 <p>
-That is exactly the corner case in the verilaxi stream checker. Imagine a FIFO that was <em>not</em> full before the edge, so the final free slot is accepted with <code>TVALID=1</code> and <code>TREADY=1</code>. The handshake is therefore valid. Then the FIFO full flag updates in the NBA region, which drives <code>TREADY</code> low. A post-NBA checker now sees <code>TVALID=1</code> and <code>TREADY=0</code> on that same edge and may incorrectly conclude that the channel was stalled, even though the beat was just accepted.
-</p>
-
-<table class="table table-bordered">
-  <thead>
-    <tr><th>Step</th><th>Signal view</th><th>Interpretation</th></tr>
-  </thead>
-  <tbody>
-    <tr><td>At the clock edge</td><td><code>TVALID=1</code>, <code>TREADY=1</code></td><td>The transfer is accepted</td></tr>
-    <tr><td>After NBA updates</td><td>FIFO becomes full, <code>TREADY</code> drops to <code>0</code></td><td>The design reacts to the accepted beat</td></tr>
-    <tr><td>Checker sees the edge</td><td><code>TVALID=1</code>, <code>TREADY=0</code></td><td>A naive stalled-channel property may misclassify the edge</td></tr>
-    <tr><td>Next cycle</td><td>The master may legally deassert <code>TVALID</code></td><td>The beat was already consumed on the previous edge</td></tr>
-  </tbody>
-</table>
-<p>Table (2): Why a completed handshake can look like a stall to a post-NBA observer</p>
-
-<p>
-Two guards are applied consistently across all properties in verilaxi to handle this:
-</p>
-
-<ul>
-  <li><strong><code>|| tready</code> in the consequent</strong> — allows the master to deassert VALID if READY is high at the next cycle, meaning the handshake completed</li>
-  <li><strong><code>!$fell(tready)</code> in the antecedent</strong> — excludes the cycle where READY transitions from 1 to 0, which can happen when a FIFO fills on the same edge as a handshake</li>
-</ul>
-
-<p>
-All properties shown below include both guards. A spurious deassert — VALID going low while READY is already low — is still caught.
-</p>
-
-<p>
-In other words, the fix is not "turn the rule off when Verilator gets confused." The fix is to ask a slightly more precise question: was the channel truly stalled for a whole cycle, or did READY only appear low because the design consumed a beat and updated its state immediately afterwards? The <code>!$fell(tready)</code> term removes that ambiguous edge, and the <code>|| tready</code> term allows VALID or payload to change on the next cycle if the previous cycle actually completed a handshake.
+False failures that appear after removing those escapes usually indicate a testbench race. A procedural BFM must not change READY, VALID, or payload in the same active-region edge where the DUT and assertions sample them. Verilaxi drivers set up controls on the falling edge and count transfers only when <code>VALID &amp;&amp; READY</code> is observed at the following rising edge. This makes the intended handshake unambiguous across simulators.
 </p>
 
 <h2 class="section-heading">Waveforms and sampled interfaces</h2>
@@ -217,7 +159,7 @@ There is a related but separate source of confusion when reading waveforms in ve
 </p>
 
 <p>
-That waveform convenience is <em>not</em> the same issue as the post-NBA assertion caveat. A sampled interface is simply a registered mirror of another interface, so it may lag or clean up what you see in the wave dump. The assertion caveat, by contrast, is about which simulation region the checker observes for the same clock edge. Both affect what a human sees during debug, but only the latter changes whether a naive SVA can produce a false positive.
+That waveform convenience does not change assertion semantics. A sampled interface is simply a registered mirror of another interface, so it may lag or clean up what you see in the wave dump. Assertions should be connected to the actual protocol interface and BFMs should establish their outputs before the active sampling edge.
 </p>
 
 <p>
@@ -226,7 +168,7 @@ So the practical debugging advice is:
 
 <ul>
   <li>If a waveform looks one cycle "cleaner" or more delayed than expected, check whether you are looking at a sampled interface used for observability.</li>
-  <li>If an assertion seems to complain even though the handshake looks legal, think about preponed versus post-NBA observation of the same edge.</li>
+  <li>If an assertion seems to complain even though the handshake looks legal, check whether a BFM drives READY, VALID, or payload in the same active-region edge where the DUT samples it.</li>
 </ul>
 
 <h2 class="section-heading">The four checkers</h2>
@@ -272,16 +214,8 @@ assert property (p_tvalid_stable)
 <p>Basic TVALID stability property</p>
 
 <p>
-In Verilator, however, this property fires a false positive at the handshake cycle — for the reason explained at the top of this post. The fix applies the two guards:
+No READY escape is required. If this strict property fails, inspect the source or BFM for an edge-ordering race before weakening the assertion.
 </p>
-
-<pre><code>// Corrected for Verilator post-NBA evaluation
-property p_tvalid_stable;
-    @(posedge clk) disable iff (!rst_n)
-    tvalid && !tready && !$fell(tready) |=> tvalid || tready;
-endproperty
-</code></pre>
-<p>VALID stability property corrected for Verilator's post-NBA evaluation</p>
 
 <h2 class="section-heading">Payload stability</h2>
 
@@ -296,7 +230,7 @@ This is where the combination of AXI and SVA becomes especially natural. Once th
 <pre><code>// Payload must not change while TVALID is high and TREADY is low
 property p_tdata_stable;
     @(posedge clk) disable iff (!rst_n)
-    tvalid && !tready && !$fell(tready) |=> $stable(tdata) || tready;
+    tvalid && !tready |=> $stable(tdata);
 endproperty
 
 assert property (p_tdata_stable)
@@ -374,10 +308,10 @@ This is the check that verilaxi's S2MM and MM2S engines are specifically designe
 <h2 class="section-heading">Enabling assertions in Verilator</h2>
 
 <p>
-Assertions are compiled but silently ignored unless the <code>--assert</code> flag is passed to Verilator. Without it, all <code>assert property</code> and <code>cover property</code> statements are no-ops. In verilaxi this flag is always enabled in <code>mk/config.mk</code>:
+Assertions are compiled but silently ignored unless the <code>--assert</code> flag is passed to Verilator. Without it, all <code>assert property</code> and <code>cover property</code> statements are no-ops. In verilaxi this flag is always enabled in <code>mk/build.mk</code>:
 </p>
 
-<pre><code>VERILATOR_FLAGS += --assert
+<pre><code>verilator -Wall --assert \
 </code></pre>
 
 <p>
@@ -387,7 +321,7 @@ When an assertion fires, Verilator prints the simulation time, the full hierarch
 <h2 class="section-heading">Summary</h2>
 
 <p>
-SVA protocol checkers are a lightweight and highly effective addition to any AXI testbench. VALID stability and payload stability catch the most common driver and FSM bugs. WLAST and RLAST alignment checkers catch burst-count errors. The 4KB boundary checker is essential for any engine that issues multi-beat bursts near page boundaries. All four checks in verilaxi are Verilator-compatible, with the post-NBA sampling caveat handled by the <code>!$fell(tready)</code> guard and the <code>|| tready</code> consequent. The full checker source is available in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>.
+SVA protocol checkers are a lightweight and highly effective addition to any AXI testbench. VALID stability and payload stability catch the most common driver and FSM bugs. WLAST and RLAST alignment checkers catch burst-count errors. The 4KB boundary checker is essential for any engine that issues multi-beat bursts near page boundaries. All four checks in verilaxi use strict stability properties without <code>$fell(ready)</code> guards or <code>|| ready</code> escapes and are validated with Verilator 5.048. The full checker source is available in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>.
 </p>
 
 <p>
