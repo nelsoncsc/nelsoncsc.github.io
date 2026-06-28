@@ -1,0 +1,40 @@
+<svg viewBox="0 0 640 420" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+  <rect width="640" height="420" fill="#ffffff"/>
+
+  <!-- total frame rectangle (H_total x V_total) -->
+  <rect x="60" y="40" width="520" height="330" fill="#eef1f5" stroke="#999" stroke-width="1"/>
+
+  <!-- active region -->
+  <rect x="160" y="120" width="360" height="200" fill="#9ec9ff" stroke="#2b6cb0" stroke-width="1.5"/>
+  <text x="340" y="225" text-anchor="middle" font-size="18" fill="#1a365d" font-weight="bold">Active video</text>
+  <text x="340" y="248" text-anchor="middle" font-size="13" fill="#1a365d">H_active &#215; V_active (the visible picture)</text>
+
+  <!-- blanking labels -->
+  <text x="110" y="225" text-anchor="middle" font-size="12" fill="#555" transform="rotate(-90 110 225)">H back porch</text>
+  <text x="548" y="225" text-anchor="middle" font-size="12" fill="#555" transform="rotate(-90 548 225)">H front porch</text>
+  <text x="340" y="90"  text-anchor="middle" font-size="12" fill="#555">V back porch (top blanking)</text>
+  <text x="340" y="350" text-anchor="middle" font-size="12" fill="#555">V front porch (bottom blanking)</text>
+
+  <!-- hsync strip (left, narrow) -->
+  <rect x="60" y="120" width="22" height="200" fill="#f6c177" stroke="#b7791f" stroke-width="1"/>
+  <text x="71" y="225" text-anchor="middle" font-size="11" fill="#7b341e" transform="rotate(-90 71 225)">HSYNC</text>
+  <!-- vsync strip (top, narrow) -->
+  <rect x="160" y="40" width="360" height="20" fill="#f6c177" stroke="#b7791f" stroke-width="1"/>
+  <text x="340" y="54" text-anchor="middle" font-size="11" fill="#7b341e">VSYNC</text>
+
+  <!-- scan arrow across one active line -->
+  <line x1="160" y1="160" x2="520" y2="160" stroke="#e53e3e" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="340" y="152" text-anchor="middle" font-size="11" fill="#c53030">raster scan: left &#8594; right, one line at a time</text>
+  <!-- return -->
+  <line x1="520" y1="172" x2="160" y2="184" stroke="#e53e3e" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+
+  <!-- dimension brackets -->
+  <text x="340" y="392" text-anchor="middle" font-size="12" fill="#333">&#8592;&#160;&#160; H_total = H_active + front + sync + back (pixel-clock ticks per line) &#160;&#160;&#8594;</text>
+  <text x="34" y="205" text-anchor="middle" font-size="12" fill="#333" transform="rotate(-90 34 205)">&#8592;  V_total = V_active + porches + sync (lines per frame)  &#8594;</text>
+
+  <defs>
+    <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#e53e3e"/>
+    </marker>
+  </defs>
+</svg>

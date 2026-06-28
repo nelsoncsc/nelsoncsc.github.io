@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - Video basics for hardware engineers: pixels, YCbCr, chroma subsampling, active/blanking geometry, pixel clocks, AXI-Stream, backpressure, CDC, memory bandwidth and video testbenches.">
+    <meta name="keywords" content="video, pixel clock, blanking, video timing, YCbCr, chroma subsampling, 4:2:2, 4:2:0, AXI-Stream, video to AXI, CDC, async FIFO, backpressure, SystemVerilog, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>Video basics for hardware engineers</title>
+
+
+    <link rel="canonical" href="https://sistenix.com/video_basics.html">
+<!-- Bootstrap Core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <!-- Custom Fonts -->
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <!-- SEO: article metadata -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Video basics for hardware engineers">
+    <meta property="og:description" content="Video basics for hardware engineers: pixels, YCbCr, chroma subsampling, active/blanking geometry, pixel clocks, AXI-Stream, backpressure, CDC, and Verilaxi testbenches.">
+    <meta property="og:url" content="https://sistenix.com/video_basics.html">
+    <meta property="og:site_name" content="sistenix.com">
+    <meta property="og:image" content="https://sistenix.com/img/squirrel_motion.png">
+    <meta property="article:published_time" content="2026-06-28T12:00:00+00:00">
+    <meta property="article:modified_time" content="2026-06-28T12:00:00+00:00">
+    <meta property="article:author" content="Nelson Campos">
+    <meta property="article:section" content="Hardware Design">
+    <meta property="article:tag" content="video timing">
+    <meta property="article:tag" content="AXI-Stream">
+    <meta property="article:tag" content="YCbCr">
+    <meta property="article:tag" content="CDC">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Video basics for hardware engineers">
+    <meta name="twitter:description" content="Video basics for hardware engineers: pixels, YCbCr, chroma subsampling, active/blanking geometry, pixel clocks, AXI-Stream, backpressure, CDC, and Verilaxi testbenches.">
+    <meta name="twitter:image" content="https://sistenix.com/img/squirrel_motion.png">
+    <link rel="next" href="https://sistenix.com/vdma.html">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Video basics for hardware engineers",
+      "description": "Video basics for hardware engineers: pixels, YCbCr, chroma subsampling, active/blanking geometry, pixel clocks, AXI-Stream, backpressure, CDC, and Verilaxi testbenches.",
+      "image": "https://sistenix.com/img/squirrel_motion.png",
+      "url": "https://sistenix.com/video_basics.html",
+      "datePublished": "2026-06-28T12:00:00+00:00",
+      "dateModified": "2026-06-28T12:00:00+00:00",
+      "author": {"@type": "Person", "name": "Nelson Campos", "url": "https://github.com/nelsoncsc"},
+      "publisher": {"@type": "Organization", "name": "sistenix.com", "url": "https://sistenix.com"},
+      "mainEntityOfPage": {"@type": "WebPage", "@id": "https://sistenix.com/video_basics.html"},
+      "keywords": "video timing, pixel clock, YCbCr, chroma subsampling, AXI-Stream, CDC, SystemVerilog, Verilator, verilaxi"
+    }
+    </script>
+    <!-- /SEO: article metadata -->
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="/">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a></li>
+                    <li><a href="https://github.com/nelsoncsc/nelsoncsc">About</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>Video basics for hardware engineers</h1>
+                        <h2 class="subheading">Pixels, clocks and the long road from a camera to an AXI bus</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on June 28, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Post Content -->
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+
+                    <p>A photograph is easy: a grid of pixels sitting still. <strong>Video</strong> is the same grid, but now it has to move &mdash; a new picture every sixteen milliseconds or so, forever, without ever stuttering. That single requirement, <em>never stop</em>, is what makes video interesting in hardware. The maths of a pixel is trivial; the hard part is keeping a river of pixels flowing across clock domains, through memory, and onto a screen with no gaps.</p>
+
+                    <p>That is the mental model I like to keep: <strong>video is pixels that must never stop</strong>. A CPU can wait. A bus transaction can stall. A software thread can sleep. But a camera sensor and a display timing generator are ruthless little metronomes. When the pixel clock says the next active pixel exists, the hardware either captures it, displays it, or loses it.</p>
+
+                    <p>In this post I want to build the model from the ground up: what a frame really is, why we throw away colour on purpose, how a frame is scanned in time, where the pixel clock comes from, and how all of that is bridged onto an <strong>AXI-Stream</strong> fabric so a System-on-Chip can actually carry it. The examples come from <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>, my UVM-free SystemVerilog video and DMA library, and they use two friends as test images: a <strong>seagull</strong> and a <strong>squirrel</strong>.</p>
+
+                    <p>We will stay deliberately close to hardware. Not just &ldquo;what is YCbCr?&rdquo;, but what signal changes. Not just &ldquo;what is blanking?&rdquo;, but which counter emits <code>active_video</code>, <code>hsync</code>, <code>vsync</code>, <code>sof</code>, and <code>eol</code>. The aim is to end with enough intuition to read a video RTL block diagram without it looking like a bag of acronyms.</p>
+
+                    <h2 class="section-heading">A frame is just numbers &mdash; until it has to move</h2>
+
+                    <p>A colour frame is a width &times; height array of pixels, each pixel three 8-bit numbers: red, green and blue. Here is one frame of our seagull, 320&times;296 pixels:</p>
+
+                    <a href="img/seagull_rgb.png">
+                        <img class="img-responsive center-block" src="img/seagull_rgb.png" width="320" alt="Seagull RGB frame">
+                    </a>
+                    <span class="caption text-muted">Figure (1): a single RGB frame (the seagull).</span>
+
+                    <p>Now make it a video. A video is nothing more than that frame, repeated and slightly changed, many times per second. Crop six consecutive frames of a running squirrel and lay them side by side and you can see the motion that the eye will reassemble into movement. This is also why older image-processing blocks such as the <a href="sobel.html">Sobel edge detector</a> become more interesting in video: the problem is no longer just computing one image, but sustaining that computation frame after frame.</p>
+
+                    <a href="img/squirrel_motion.png">
+                        <img class="img-responsive center-block" src="img/squirrel_motion.png" alt="Squirrel motion across six frames">
+                    </a>
+                    <span class="caption text-muted">Figure (2): six frames over time &mdash; this is all &ldquo;video&rdquo; really is.</span>
+
+                    <p>Let us count the cost. One 1080p frame is 1920 &times; 1080 &times; 3 = about 6.2&nbsp;MB. At 60&nbsp;frames per second that is <strong>373&nbsp;MB every second</strong>, or roughly 3&nbsp;Gbit/s, and that is just <em>one</em> stream. This number is the reason every decision that follows exists: colour spaces, subsampling, careful clocking and dedicated DMA engines are all in service of moving that river without dropping a drop.</p>
+
+                    <table class="table table-bordered">
+                      <thead>
+                        <tr><th>Format</th><th>Bytes / pixel</th><th>1080p60 payload bandwidth</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr><td>RGB888 / YCbCr 4:4:4</td><td>3</td><td>~373 MB/s</td></tr>
+                        <tr><td>YCbCr 4:2:2</td><td>2</td><td>~249 MB/s</td></tr>
+                        <tr><td>YCbCr 4:2:0</td><td>1.5</td><td>~187 MB/s</td></tr>
+                      </tbody>
+                    </table>
+                    <p>Table (1): payload bandwidth only &mdash; no blanking, no packet overhead, no memory bursts, no cache lines. Real systems still need margin.</p>
+
+                    <p>This is also why small 8&times;4, 32&times;16 and 64&times;48 tests are useful. They let the RTL prove pixel order, line ends, frame markers and corner cases quickly. They are not pretending to model a final 1080p memory volume; they are making the bugs cheap to find before the same logic is asked to move hundreds of megabytes per second.</p>
+
+                    <h2 class="section-heading">Throwing colour away on purpose: YCbCr</h2>
+
+                    <p>The human eye is more sensitive to light variation than to colour variation. We can exploit that, but first we have to separate brightness from colour, which RGB does not do. The <strong>YCbCr</strong> colour space splits a pixel into luminance <em>Y</em> (brightness) and two chrominance differences, <em>Cb</em> (blue&ndash;luma) and <em>Cr</em> (red&ndash;luma). I covered the conversion and its shift-and-add hardware in detail in an earlier post, <a href="rgb2ycbcr.html">RGB to YCbCr conversion</a>; in verilaxi it is the <code>snix_video_rgb_to_ycbcr</code> / <code>snix_video_ycbcr_to_rgb</code> pair.</p>
+
+                    <p>The hardware style is the same idea as the older Sistenix RGB-to-YCbCr implementation: avoid general multipliers when fixed coefficients can be approximated with shifts and additions. For an 8-bit pixel, the BT.601-style equations can be implemented as fixed-point integer arithmetic, then rounded or clipped back to 8 bits.</p>
+
+<pre><code>// Hardware idea: fixed coefficients become shifts and adds
+// Y ~= 16 + (66*R + 129*G + 25*B) / 256
+y_sum = (r << 6) + (r << 1) +       // 64R + 2R  = 66R
+        (g << 7) + g +              // 128G + G  = 129G
+        (b << 4) + (b << 3) + b;    // 16B + 8B + B = 25B
+y     = 8'(16 + (y_sum >> 8));
+</code></pre>
+                    <p>This is an architectural habit worth keeping: video datapaths are often simple arithmetic repeated millions of times per second. Replacing a multiplier with adders and shifts is not cosmetic; it affects area, timing closure and power.</p>
+
+                    <p>Splitting the seagull into its three YCbCr planes shows what each carries. Notice that <em>Y</em> alone is a perfectly readable greyscale photo &mdash; almost all the detail lives there &mdash; while <em>Cb</em> and <em>Cr</em> are smooth and low-contrast:</p>
+
+                    <a href="img/seagull_y.png"><img class="img-responsive center-block" src="img/seagull_y.png" width="280" alt="Y luma channel"></a>
+                    <span class="caption text-muted">Figure (3): the luminance Y &mdash; all the sharpness lives here.</span>
+                    <a href="img/seagull_cb.png"><img class="img-responsive center-block" src="img/seagull_cb.png" width="280" alt="Cb chroma channel"></a>
+                    <span class="caption text-muted">Figure (4): the Cb (blue-difference) chrominance.</span>
+                    <a href="img/seagull_cr.png"><img class="img-responsive center-block" src="img/seagull_cr.png" width="280" alt="Cr chroma channel"></a>
+                    <span class="caption text-muted">Figure (5): the Cr (red-difference) chrominance.</span>
+
+                    <h2 class="section-heading">Chroma subsampling: 4:4:4, 4:2:2, 4:2:0 and NV12</h2>
+
+                    <p>Because the eye is more sensitive to light variation than to colour variation, we can store the colour-difference planes at <em>lower resolution</em> than luma. This is <strong>chroma subsampling</strong>. It is one of the most important tricks in video hardware because it reduces memory bandwidth before any codec has even started doing clever compression.</p>
+
+                    <p>The biological reason is simple but profound. A sharp black/white edge is immediately obvious; a small blur in the blue-difference or red-difference channel is much harder to see, especially in natural images. Video systems exploit that asymmetry: preserve <strong>Y</strong> (light/brightness) at full resolution, reduce <strong>Cb</strong> and <strong>Cr</strong> (colour difference). That same luminance-first intuition appears in many ISP algorithms; for example, edge detectors and feature extractors often care more about the brightness structure than the exact chroma value. The older <a href="sobel.html">Sobel</a> and <a href="isp_uvm.html">ISP/UVM</a> posts are useful companion pieces for that image-processing side of the story.</p>
+
+                    <p>The 4:a:b notation is unfortunately compact, so let us decode it carefully. It describes how many <strong>colour</strong> samples are kept relative to a small block of <strong>luma</strong> samples. The first number, 4, is the reference width: imagine four neighbouring pixels in a line. Those four pixels always keep four Y samples. The second number tells how many Cb/Cr samples are kept across that first line. The third number tells how chroma is represented on the next line. So the notation is not saying that light is sampled every other pixel; <strong>Y remains per-pixel</strong>. It is the colour difference, Cb/Cr, that is sampled less often.</p>
+
+                    <p>In practical terms:</p>
+                    <ul>
+                        <li><strong>4:4:4</strong> keeps colour for every pixel: no subsampling.</li>
+                        <li><strong>4:2:2</strong> keeps colour every other pixel horizontally: pixels 0 and 1 share one Cb/Cr pair, pixels 2 and 3 share the next pair. Luma is still stored for every pixel.</li>
+                        <li><strong>4:2:0</strong> keeps colour every other pixel horizontally and every other line vertically: a 2&times;2 block shares one Cb/Cr pair. Luma is still stored for all four pixels.</li>
+                        <li><strong>4:4:0</strong>, less common, keeps full horizontal colour resolution but samples colour every other line vertically.</li>
+                    </ul>
+
+                    <p>Read the common formats like this:</p>
+
+                    <table class="table table-bordered">
+                      <thead>
+                        <tr><th>Format</th><th>Meaning</th><th>Chroma resolution</th><th>Typical bytes/pixel</th><th>Where it appears</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr><td><strong>4:4:4</strong></td><td>No chroma subsampling</td><td>Cb/Cr at full width and full height</td><td>3</td><td>RGB-like processing, high-quality internal pipelines</td></tr>
+                        <tr><td><strong>4:2:2</strong></td><td>Share chroma horizontally between two pixels</td><td>half width, full height</td><td>2</td><td>broadcast video, camera/display pipelines, YUYV/UYVY</td></tr>
+                        <tr><td><strong>4:2:0</strong></td><td>Share chroma across a 2&times;2 pixel block</td><td>half width, half height</td><td>1.5</td><td>NV12, I420, video codecs, camera buffers</td></tr>
+                        <tr><td><strong>4:4:0</strong></td><td>Share chroma vertically but not horizontally</td><td>full width, half height</td><td>2</td><td>uncommon, but useful for understanding the notation</td></tr>
+                      </tbody>
+                    </table>
+                    <p>Table (2): chroma subsampling stores fewer Cb/Cr samples. It is not entropy compression; it is a deliberate reduction in colour resolution.</p>
+
+                    <p>For a tiny 2&times;2 block, the difference is easy to see:</p>
+
+<pre><code>4:4:4  (full chroma)
+Y00 Cb00 Cr00   Y01 Cb01 Cr01
+Y10 Cb10 Cr10   Y11 Cb11 Cr11
+
+4:2:2  (horizontal sharing)
+Y00 Cb0 Cr0    Y01 Cb0 Cr0
+Y10 Cb1 Cr1    Y11 Cb1 Cr1
+
+4:2:0  (horizontal + vertical sharing)
+Y00 Cb0 Cr0    Y01 Cb0 Cr0
+Y10 Cb0 Cr0    Y11 Cb0 Cr0
+</code></pre>
+
+                    <p>In 4:4:4 each pixel has its own luma and chroma. In 4:2:2 each pair of horizontal pixels has separate luma values but a shared chroma pair. In 4:2:0 all four pixels in a 2&times;2 block keep their own luma values, but share one Cb and one Cr. That is how 4:2:0 reaches 12 bits per pixel on average: four Y samples plus one Cb plus one Cr = six bytes for four pixels.</p>
+
+                    <p>Keep <em>Y</em> at full resolution, throw away three-quarters of the chroma samples (4:2:0), and reconstruct. The result is almost indistinguishable from the original &mdash; which is exactly the point:</p>
+
+                    <a href="img/seagull_422.png"><img class="img-responsive center-block" src="img/seagull_422.png" width="320" alt="Seagull reconstructed from 4:2:2"></a>
+                    <span class="caption text-muted">Figure (6): reconstructed from 4:2:2 chroma (33% fewer bytes).</span>
+                    <a href="img/seagull_420.png"><img class="img-responsive center-block" src="img/seagull_420.png" width="320" alt="Seagull reconstructed from 4:2:0"></a>
+                    <span class="caption text-muted">Figure (7): reconstructed from 4:2:0 chroma (50% fewer bytes) &mdash; the eye hardly complains.</span>
+
+                    <h3>How packed 4:2:2 works: YUYV and UYVY</h3>
+
+                    <p>4:2:2 is often stored as a packed byte stream. Two neighbouring pixels become four bytes. The two luma samples are kept independently, while the chroma pair is shared:</p>
+
+<pre><code>// Two pixels, packed as YUYV
+byte0 = Y0;
+byte1 = U0;   // Cb shared by pixel 0 and 1
+byte2 = Y1;
+byte3 = V0;   // Cr shared by pixel 0 and 1
+
+// The same information, packed as UYVY
+byte0 = U0;
+byte1 = Y0;
+byte2 = V0;
+byte3 = Y1;
+</code></pre>
+
+                    <p>This is why 4:2:2 is 16 bits per pixel on average: four bytes describe two pixels. Hardware likes this format because it streams naturally, has no separate planes to chase, and maps well to camera/display datapaths that process pixels in raster order.</p>
+
+                    <p>In verilaxi the 4:4:4&nbsp;&harr;&nbsp;4:2:2 conversion is a small two-pixel state machine, <code>snix_video_csc_422</code> (pack) and <code>snix_video_csc_422_expand</code> (unpack): the packer box-averages the chroma of an even/odd pixel pair into one beat, and the expander replays the shared chroma back across two pixels.</p>
+
+                    <pre><code>// Conceptually: two RGB/YCbCr 4:4:4 pixels become one 4:2:2 pair
+Y0 = y_even;
+Y1 = y_odd;
+Cb = (cb_even + cb_odd) / 2;
+Cr = (cr_even + cr_odd) / 2;
+</code></pre>
+                    <p>That little average is the whole trick: keep the per-pixel brightness, share the slower-changing colour.</p>
+
+                    <h3>How 4:2:0 works in memory: NV12</h3>
+
+                    <p>4:2:0 is usually not packed one pixel at a time. It is commonly stored as a <strong>semi-planar</strong> buffer. The most common example is <strong>NV12</strong>: one full-resolution Y plane followed by one interleaved UV plane at half width and half height.</p>
+
+<pre><code>// NV12 memory layout for width W, height H
+base + 0:             Y plane,  W * H bytes
+base + W*H:           UV plane, W * H / 2 bytes
+
+// Y plane: one byte per pixel
+Y(row, col)  = mem[base + row * stride_y + col]
+
+// UV plane: one U,V pair for each 2x2 luma block
+uv_row       = row / 2;
+uv_col_pair  = col / 2;
+U(row, col)  = mem[uv_base + uv_row * stride_uv + 2 * uv_col_pair + 0]
+V(row, col)  = mem[uv_base + uv_row * stride_uv + 2 * uv_col_pair + 1]
+</code></pre>
+
+                    <p>For a 4&times;2 image, the layout looks like this:</p>
+
+<pre><code>Y plane, 4x2:
+Y00 Y01 Y02 Y03
+Y10 Y11 Y12 Y13
+
+UV plane, 2x1 pairs, interleaved:
+U00 V00   U02 V02
+
+Pixels (0,0), (0,1), (1,0), (1,1) share U00/V00.
+Pixels (0,2), (0,3), (1,2), (1,3) share U02/V02.
+</code></pre>
+
+                    <p>This is a major architectural decision. A packed 4:2:2 stream can be processed mostly in raster order. NV12 needs plane-aware address generation: first read or write the Y plane, then read or write a UV plane whose rows advance at half the vertical rate. A DMA or image accelerator that supports NV12 therefore needs format-aware line strides, plane base addresses, and careful handling of even/odd rows. That is the kind of detail that separates a toy video demo from an ISP-friendly memory subsystem.</p>
+
+                    <p>It is also worth being precise with language. Chroma subsampling is often casually called compression, but it is not a codec by itself. It does not search for motion vectors, remove frequency coefficients, or entropy-code symbols. It simply stores fewer chroma samples because the human visual system is forgiving there. Codecs such as H.264, H.265 and AV1 usually start from subsampled formats such as 4:2:0, then apply much more aggressive compression on top.</p>
+
+                    <h2 class="section-heading">How a frame is scanned: timing and blanking</h2>
+
+                    <p>A display does not receive a frame all at once. It is painted one line at a time, left to right, top to bottom &mdash; a <strong>raster scan</strong>, inherited from the days of the cathode-ray tube. Crucially, the scan spends time <em>outside</em> the visible picture: after each line there is a gap (the horizontal porches and the <strong>HSYNC</strong> pulse) and after each frame there is a larger gap (the vertical porches and <strong>VSYNC</strong>). These gaps are the <strong>blanking</strong> intervals, and they are not wasted &mdash; they gave old monitors time to fly the beam back, and today they still carry the sync pulses that tell the receiver where a line and a frame begin.</p>
+
+                    <a href="img/video_raster.svg">
+                        <img class="img-responsive center-block" src="img/video_raster.svg" alt="Raster scan with active region and blanking">
+                    </a>
+                    <span class="caption text-muted">Figure (8): one frame &mdash; a small visible window (active video) surrounded by blanking, scanned line by line.</span>
+
+                    <p>So the real frame the hardware walks through is bigger than the picture. Its dimensions are:</p>
+                    <div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">H_total = H_active + H_front_porch + H_sync + H_back_porch
+V_total = V_active + V_front_porch + V_sync + V_back_porch</pre></div>
+                    <span class="caption text-muted">The total raster: visible area plus blanking, in pixels (H) and lines (V).</span>
+
+                    <table class="table table-bordered">
+                      <thead>
+                        <tr><th>Mode</th><th>Active</th><th>Horizontal geometry</th><th>Vertical geometry</th><th>Totals</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr><td>720p60</td><td>1280&times;720</td><td>1280 + 110 + 40 + 220</td><td>720 + 5 + 5 + 20</td><td>1650&times;750</td></tr>
+                        <tr><td>1080p60</td><td>1920&times;1080</td><td>1920 + 88 + 44 + 148</td><td>1080 + 4 + 5 + 36</td><td>2200&times;1125</td></tr>
+                      </tbody>
+                    </table>
+                    <p>Table (3): active pixels are only the visible rectangle. The timing generator walks the totals, including front porch, sync pulse and back porch.</p>
+
+                    <p>These extra blanking samples matter because they consume pixel-clock cycles even though they are not written to the video frame in memory. For 1080p60 the visible payload is 1920&times;1080&times;60 = 124.4 Mpixels/s, but the timing generator actually ticks through 2200&times;1125&times;60 = 148.5 million raster positions per second. The missing 24.1 million positions are blanking and sync.</p>
+
+                    <p>In verilaxi these numbers live in a single struct, <code>video_timing_t</code>, with ready-made presets (<code>VGA_640x480</code>, <code>HD_1280x720</code>, &hellip;). The block <code>snix_video_timing_gen</code> is just two counters &mdash; a pixel counter and a line counter &mdash; that walk the total raster and emit four signals: <code>active_video</code> (are we inside the picture?), <code>hsync</code>, <code>vsync</code>, and the convenient <code>sof</code> (start-of-frame) and <code>eol</code> (end-of-line) pulses.</p>
+
+                    <pre><code>// snix_video_timing_gen.sv, simplified from the RTL
+localparam int H_TOTAL = TIMING.h_active + TIMING.h_front_porch +
+                         TIMING.h_sync_pulse + TIMING.h_back_porch;
+localparam int V_TOTAL = TIMING.v_active + TIMING.v_front_porch +
+                         TIMING.v_sync_pulse + TIMING.v_back_porch;
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        h_count <= '0;
+        v_count <= '0;
+    end else if (h_count == H_TOTAL - 1) begin
+        h_count <= '0;
+        v_count <= (v_count == V_TOTAL - 1) ? '0 : v_count + 1'b1;
+    end else begin
+        h_count <= h_count + 1'b1;
+    end
+end
+
+assign active_video = (h_count < TIMING.h_active) &&
+                      (v_count < TIMING.v_active);
+assign sof          = active_video && (h_count == 0) && (v_count == 0);
+assign eol          = active_video && (h_count == TIMING.h_active - 1);
+assign hsync        = h_count inside horizontal sync window;
+assign vsync        = v_count inside vertical sync window;
+</code></pre>
+                    <p>This is why a video timing generator is less mysterious than it first looks. Most of it is disciplined counting. The design decision is to make the timing preset explicit and strongly typed, so the same generator can emit tiny simulation modes such as 8&times;4 and real display modes such as 720p and 1080p.</p>
+
+                    <h2 class="section-heading">Where the pixel clock comes from</h2>
+
+                    <p>Every one of those total-raster positions &mdash; visible <em>and</em> blanking &mdash; is one tick of the <strong>pixel clock</strong>. So the pixel-clock frequency is fixed entirely by the resolution and the refresh rate:</p>
+                    <div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">f_pixel = H_total &#215; V_total &#215; frames_per_second</pre></div>
+                    <span class="caption text-muted">The pixel clock is not a free choice &mdash; the display standard sets it.</span>
+
+                    <p>Two worked examples make it concrete:</p>
+                    <ul>
+                        <li><strong>720p60:</strong> 1650 &times; 750 &times; 60 = <strong>74.25&nbsp;MHz</strong></li>
+                        <li><strong>1080p60:</strong> 2200 &times; 1125 &times; 60 = <strong>148.5&nbsp;MHz</strong></li>
+                    </ul>
+                    <p>Notice the totals (1650&times;750, 2200&times;1125) are larger than the visible 1280&times;720 and 1920&times;1080 &mdash; the difference is the blanking you just met. On a real FPGA this clock is produced by an MMCM/PLL; it is a hard, externally-imposed rate, and the pixels arrive on it whether your design is ready or not. Hold that thought.</p>
+
+                    <p>One subtle architectural consequence follows: <strong>the pixel clock is not selected to match the AXI bus</strong>. The display standard chooses the pixel clock; the SoC chooses the memory clock. If those domains are unrelated, the design needs a real clock-domain crossing. If they are frequency-related but phase-independent, it still needs a real crossing. Hoping that 74.25&nbsp;MHz and 200&nbsp;MHz &ldquo;usually line up&rdquo; is not a hardware design strategy.</p>
+
+                    <h2 class="section-heading">Two worlds: the pixel clock and the AXI clock</h2>
+
+                    <p>Inside a SoC, pixels do not stay on the pixel clock for long. The memory, the DMA engines and the interconnect all run on a different, usually faster, <strong>AXI clock</strong> (200&nbsp;MHz is typical), unrelated to the 74.25 or 148.5&nbsp;MHz of the display. We therefore have two clock domains that must meet, and a frame must be reshaped to fit the bus.</p>
+
+                    <p>On the AXI side a frame is described by its <strong>geometry</strong> in bytes, not porches:</p>
+                    <ul>
+                        <li><strong>HSIZE</strong> &mdash; bytes per line (e.g. 1920 pixels &times; bytes-per-pixel),</li>
+                        <li><strong>VSIZE</strong> &mdash; number of lines,</li>
+                        <li><strong>STRIDE</strong> &mdash; bytes from the start of one line to the start of the next in memory; <code>stride &ge; hsize</code>, and the slack is per-line padding that keeps each line aligned to a convenient address boundary.</li>
+                    </ul>
+                    <p>There are no porches here and <strong>no blanking</strong>: AXI is a handshake bus, so &ldquo;nothing happening&rdquo; is simply a cycle where the data-valid signal is low. The blanking only reappears at the very end, when we hand pixels back to a display.</p>
+
+                    <pre><code>// Example: RGB888 frame in memory
+hsize  = width * 3;          // useful bytes per line
+vsize  = height;             // useful lines
+stride = align_up(hsize, 64); // optional padding for memory alignment
+addr(line, x) = base + line * stride + x * 3;
+</code></pre>
+                    <p>That distinction is important: the display sees time; the DMA sees addresses.</p>
+
+                    <table class="table table-bordered">
+                      <thead>
+                        <tr><th>Concept</th><th>Video timing side</th><th>AXI / memory side</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr><td>Unit</td><td>pixels and lines in time</td><td>bytes and addresses</td></tr>
+                        <tr><td>Visible area</td><td><code>active_video</code></td><td><code>hsize</code> and <code>vsize</code></td></tr>
+                        <tr><td>Line boundary</td><td><code>eol</code> pulse</td><td><code>tlast</code> / new burst or next stride</td></tr>
+                        <tr><td>Frame boundary</td><td><code>sof</code> pulse / <code>vsync</code></td><td>frame slot address</td></tr>
+                        <tr><td>Blanking</td><td>front porch, sync, back porch</td><td>no transfer</td></tr>
+                        <tr><td>Stall behaviour</td><td>cannot stall a live source</td><td>can apply ready/backpressure</td></tr>
+                      </tbody>
+                    </table>
+                    <p>Table (4): the same frame has two personalities. Confusing them is a common source of broken video DMA designs.</p>
+
+                    <p>Stride deserves special attention. If <code>hsize = 1920 * 3 = 5760</code> bytes, a designer may choose <code>stride = 5760</code> for a tightly packed frame, or round it up to 5824 or 5888 bytes to satisfy alignment or cache-line constraints. The displayed image is still 1920 pixels wide; the padding bytes at the end of each line are memory layout, not visible pixels.</p>
+
+                    <h2 class="section-heading">Crossing over: video &harr; AXI-Stream</h2>
+
+                    <p>The bridge between the native video timing and the AXI world is a pair of tiny adapters. Going <em>in</em>, <code>snix_video_to_axis</code> maps the timing signals straight onto AXI-Stream:</p>
+
+                    <div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">video_de    &#8594;  m_axis_tvalid     (a pixel is present this cycle)
+video_data  &#8594;  m_axis_tdata      (the RGB pixel)
+video_sof   &#8594;  m_axis_tuser[0]   (start of frame)
+video_eol   &#8594;  m_axis_tlast      (end of line)</pre></div>
+                    <span class="caption text-muted">Native video timing becomes an AXI-Stream packet, one line per packet.</span>
+
+                    <p>Going <em>out</em>, <code>snix_axis_to_video</code> does the reverse, but with a twist that matters: the display&rsquo;s timing generator is the <strong>master</strong>. The pixel clock keeps ticking and demands a pixel on every active cycle; the adapter feeds it from the stream when data is available, and inserts a blank pixel (and raises an <code>underflow</code> flag) when it is not. This is where blanking is re-created and where the stream is re-synchronised to the rigid display timing.</p>
+
+                    <p>The actual RTL is intentionally small. The capture adapter is almost pure wiring, plus one sticky error flag. This is very much the Sistenix style of hardware design: make the protocol boundary explicit, keep the datapath readable, and let the testbench and assertions prove the contract. For the AXI-Stream protocol rules themselves, see the <a href="axi_vip.html">AXI VIP</a> and <a href="axi_sva.html">AXI SVA checker</a> posts.</p>
+
+<pre><code>// snix_video_to_axis.sv
+always_comb begin
+    m_axis_tdata    = video_data;
+    m_axis_tuser    = '0;
+    m_axis_tuser[0] = video_sof;
+    m_axis_tlast    = video_eol;
+    m_axis_tvalid   = video_de;
+end
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n)
+        overflow <= 1'b0;
+    else if (video_de && !m_axis_tready)
+        overflow <= 1'b1;
+end
+</code></pre>
+
+                    <p>The display adapter is also small, but it makes a different architectural choice: <code>tready</code> follows the display timing. If the display is in active video, it is ready to consume a pixel; if the stream does not provide one, that is an underflow.</p>
+
+<pre><code>// snix_axis_to_video.sv
+always_comb begin
+    s_axis_tready = timing_de;
+    video_de      = timing_de && s_axis_tvalid;
+    video_sof     = video_de && timing_sof;
+    video_eol     = video_de && timing_eol;
+    video_data    = video_de ? s_axis_tdata : BLANK_DATA;
+end
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        underflow   <= 1'b0;
+        frame_error <= 1'b0;
+    end else begin
+        if (timing_de && !s_axis_tvalid)
+            underflow <= 1'b1;
+
+        if (s_axis_tvalid && s_axis_tready &&
+            ((s_axis_tuser[0] != timing_sof) ||
+             (s_axis_tlast    != timing_eol)))
+            frame_error <= 1'b1;
+    end
+end
+</code></pre>
+                    <p>The two adapters look symmetric, but their failure modes are opposite. Capture overflow means a real input pixel arrived and could not be accepted. Display underflow means the screen needed a pixel and the stream did not have one ready. <code>frame_error</code> catches the more subtle bug: the pixel data may be present, but SOF/EOL markers no longer agree with the display raster.</p>
+
+                    <h2 class="section-heading">Backpressure, and why we need an async FIFO</h2>
+
+                    <p>Now the two thoughts collide. The camera/timing side <strong>cannot be stopped</strong> &mdash; the pixel clock is hard and a pixel appears every active tick. The AXI side <strong>can</strong> stall &mdash; memory may be busy, the bus may be arbitrating, so its ready signal drops for a few cycles (this is <em>backpressure</em>). A source that cannot pause feeding a sink that can pause: if you wire them directly, pixels are lost.</p>
+
+                    <p>AXI-Stream backpressure is elegant for normal digital blocks: a sink lowers <code>tready</code>, the source holds <code>tvalid</code> and keeps the payload stable, and no transfer occurs until both are high. But a live video sensor is not a normal AXI source. It does not know that DDR is refreshing or that an interconnect gave the bus to another master. It keeps producing pixels during the active window.</p>
+
+                    <table class="table table-bordered">
+                      <thead>
+                        <tr><th>Path</th><th>If downstream stalls...</th><th>What the RTL must do</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr><td>Live capture</td><td>incoming pixels keep arriving</td><td>absorb in FIFO, or flag overflow/drop</td></tr>
+                        <tr><td>Internal AXI-Stream block</td><td>source can hold data</td><td>deassert <code>tready</code>; source keeps payload stable</td></tr>
+                        <tr><td>Display output</td><td>screen still demands pixels</td><td>provide buffered pixel, or flag underflow/blank</td></tr>
+                        <tr><td>Memory-backed video path</td><td>DDR/interconnect may pause bursts</td><td>buffer enough work to ride through bounded stalls</td></tr>
+                      </tbody>
+                    </table>
+                    <p>Table (5): backpressure is not one thing. The correct response depends on whether the endpoint can actually stop.</p>
+
+                    <p>The fix is a buffer that also crosses the clock domain: an <strong>asynchronous (dual-clock) FIFO</strong>. Pixels are written on the pixel clock and read on the AXI clock; gray-coded pointers cross between the domains safely, and the FIFO&rsquo;s depth absorbs the short bursts of backpressure so the never-stopping source never overflows. I wrote about building these &mdash; and the gray-code clock-domain-crossing inside them &mdash; in <a href="fifo_cdc.html">Synchronous and Asynchronous FIFOs in Hardware</a>. In verilaxi the capture path wraps a packer plus this FIFO as <code>snix_video_capture_cdc</code>, and the display path mirrors it as <code>snix_video_display_cdc</code>. If there is one old post to read before implementing video CDC, it is that FIFO one.</p>
+
+                    <pre><code>// First-order FIFO sizing intuition
+needed_depth_pixels >= excess_pixel_rate * worst_case_stall_time
+                    + CDC_pointer_latency_margin
+                    + burst_alignment_margin;
+</code></pre>
+                    <p>This is not a replacement for a real bandwidth budget, but it is the right instinct: size the FIFO for the stall window you expect, not for wishful thinking.</p>
+
+                    <p>In a real design this FIFO is usually sized for elasticity, not for an entire frame. A few lines are often enough if the downstream memory path has bounded stalls. If the memory system can disappear for a full frame, the correct buffer is no longer a small FIFO in front of the pipeline &mdash; it is an external-memory problem. That is where the next post begins.</p>
+
+                    <h2 class="section-heading">How the testbench proves the pipeline</h2>
+
+                    <p>A video testbench has to check more than final pixel values. It must also check timing, framing, clock-domain behaviour and the uncomfortable cases where one side stalls. This follows the same philosophy as the <a href="verilator_tb.html">Verilator testbench</a>, <a href="axi_vip.html">AXI VIP</a>, and <a href="axi_sva.html">SVA checker</a> posts: use simple task-based stimulus, but check the protocol continuously. The Verilaxi video tests therefore use several layers:</p>
+
+                    <ul>
+                        <li><strong>small synthetic modes</strong> such as 8&times;4 and 32&times;16, which make every pixel and line easy to inspect;</li>
+                        <li><strong>independent pixel and AXI clocks</strong>, so CDC paths are exercised instead of accidentally hidden by one shared clock;</li>
+                        <li><strong>SOF/EOL checking</strong>, proving that <code>tuser[0]</code> and <code>tlast</code> stay aligned with the raster;</li>
+                        <li><strong>overflow/underflow flags</strong>, proving that the adapters fail loudly when the pipeline cannot keep up;</li>
+                        <li><strong>PNG-backed tests</strong>, using <code>stb_image</code> through DPI to load and write real frames, so the pipeline is not only moving colour bars;</li>
+                        <li><strong>end-to-end timing tests</strong>, which push pixels through capture CDC, memory-facing streams, playback CDC and display timing with per-frame comparison.</li>
+                    </ul>
+
+                    <p>The <code>stb_image</code> harness is deliberately small, but it says something important about Verilaxi: the testbench is not locked to artificial counters. A test can load real PNG frames from disk, turn them into pixel streams, pass them through RTL, and write the result back to PNG for visual inspection. That makes the same infrastructure useful for quick unit tests, regression tests, and image-processing experiments.</p>
+
+<pre><code>// DPI shape used by the video tests
+import "DPI-C" function void vf_src_load(input string path);
+import "DPI-C" function void vf_src_load_append(input string path);
+import "DPI-C" function int  vf_src_get_pixel(input int idx);
+import "DPI-C" function void vf_sink_push(input int rgb24);
+import "DPI-C" function void vf_sink_write(input string path,
+                                           input int width,
+                                           input int height);
+</code></pre>
+
+                    <p>That bridge is intentionally pragmatic. The RTL still sees ordinary pixels, valid/ready, SOF and EOL. The C++ side only handles file I/O and image packing. This keeps the hardware clean while making the tests much closer to how a designer thinks: &ldquo;feed this image through the block and show me what came out.&rdquo;</p>
+
+                    <p>The simplest loopback test checks the adapter pair directly: timing generator &rarr; pattern generator &rarr; video-to-AXIS &rarr; AXIS-to-video. The checker runs at the pixel level, not only at frame end:</p>
+
+<pre><code>// test_video_axis_loopback.sv, simplified
+if (active_video) begin
+    assert (recovered_de)
+        else $fatal(1, "video underflow at (%0d,%0d)", pixel_x, pixel_y);
+
+    assert (recovered_pixel == source_pixel)
+        else $fatal(1, "pixel mismatch at (%0d,%0d)", pixel_x, pixel_y);
+
+    assert (video_axis.tuser[0] == sof)
+        else $fatal(1, "SOF mismatch at (%0d,%0d)", pixel_x, pixel_y);
+
+    assert (video_axis.tlast == eol)
+        else $fatal(1, "EOL mismatch at (%0d,%0d)", pixel_x, pixel_y);
+end else begin
+    assert (!recovered_de && source_pixel == 24'h000000)
+        else $fatal(1, "non-blank output outside active video");
+end
+
+assert (!overflow && !underflow && !frame_error)
+    else $fatal(1, "adapter flags: overflow=%0b underflow=%0b frame_error=%0b",
+                overflow, underflow, frame_error);
+</code></pre>
+
+                    <p>The real-image timing test goes further. The source loads PNG frames with <code>stb_image</code>, checks their dimensions, drives the pixels through the hardware path, then compares the displayed pixels back against the same source buffer:</p>
+
+<pre><code>// test_vdma_timing.sv, PNG source setup simplified
+$sformat(p, "%s/frame_00.png", src_dir); vf_src_load(p);
+$sformat(p, "%s/frame_01.png", src_dir); vf_src_load_append(p);
+...
+
+if (vf_src_width() != H_ACTIVE || vf_src_height() != V_ACTIVE ||
+    vf_src_total_pixels() != FRAMES_TO_RUN * H_ACTIVE * V_ACTIVE)
+    $fatal(1, "PNG source mismatch");
+
+// Pixel checker on the display side
+exp_pix = vf_src_get_pixel(display_frames_done * H_ACTIVE * V_ACTIVE +
+                           disp_row * H_ACTIVE + disp_col);
+
+if (disp_tdata !== exp_pix)
+    $error("pixel mismatch frame=%0d row=%0d col=%0d",
+           display_frames_done + 1, disp_row, disp_col);
+
+assert (!cap_overflow) else $fatal(1, "capture CDC overflow");
+assert (display_errors == 0) else $fatal(1, "pixel/framing errors");
+</code></pre>
+
+                    <p>There are also small unit tests for format blocks. For example, the 4:2:2 pack/expand test sends known YCbCr pixels through the packer and expander, then checks that luma is preserved and chroma becomes the expected pair average. This is the same style as the old <a href="rgb2ycbcr.html">RGB-to-YCbCr</a> post: explain the arithmetic, implement it with simple hardware, then test exactly the arithmetic the hardware promised to perform.</p>
+
+<pre><code>// test_video_csc_422.sv, simplified checker
+pair_idx = received >> 1;
+
+assert (m_tdata[23:16] == pixels[received][23:16])
+    else $fatal(1, "CSC422 Y mismatch idx=%0d", received);
+
+assert (m_tdata[15:8]  == avg_cb[pair_idx] &&
+        m_tdata[7:0]   == avg_cr[pair_idx])
+    else $fatal(1, "CSC422 chroma mismatch idx=%0d", received);
+
+assert (m_tuser == (received == 0));
+assert (m_tlast == (received == 3));
+</code></pre>
+
+                    <p>The important point is philosophical: a video test is not finished when the final frame &ldquo;looks right&rdquo;. It should prove that every line ended in the right place, every frame started in the right place, the clocks really crossed, the colour-format arithmetic did what the architecture promised, and no invisible overflow happened along the way.</p>
+
+                    <h2 class="section-heading">Putting it together</h2>
+
+                    <p>Stack everything in order and you get the full capture-to-display video pipeline: a timing generator drives a pattern (or a real source), the video-to-AXIS adapter turns it into a stream, an async FIFO carries it across into the AXI clock domain, and on the way back out a second FIFO and the AXIS-to-video adapter rebuild the display timing and its blanking.</p>
+
+                    <table class="table table-bordered">
+                      <thead>
+                        <tr><th>Problem</th><th>Verilaxi block</th><th>Hardware idea</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr><td>Generate raster timing</td><td><code>snix_video_timing_gen</code></td><td>two counters over H_total/V_total</td></tr>
+                        <tr><td>Create test pixels</td><td><code>snix_video_pattern_gen</code></td><td>colour bars from pixel position</td></tr>
+                        <tr><td>Video to stream</td><td><code>snix_video_to_axis</code></td><td><code>de/sof/eol</code> to <code>tvalid/tuser/tlast</code></td></tr>
+                        <tr><td>Cross into AXI clock</td><td><code>snix_video_capture_cdc</code></td><td>packing + async FIFO</td></tr>
+                        <tr><td>Cross back to pixel clock</td><td><code>snix_video_display_cdc</code></td><td>async FIFO + unpacking</td></tr>
+                        <tr><td>Stream to display</td><td><code>snix_axis_to_video</code></td><td>timing generator consumes stream pixels</td></tr>
+                      </tbody>
+                    </table>
+                    <p>Table (6): the video path as a set of small, composable RTL blocks.</p>
+
+                    <a href="img/video_pipeline.svg">
+                        <img class="img-responsive center-block" src="img/video_pipeline.svg" alt="verilaxi video pipeline">
+                    </a>
+                    <span class="caption text-muted">Figure (9): the verilaxi video pipeline &mdash; pixel clock on the edges, AXI clock in the middle.</span>
+
+                    <p>What sits in the middle of that diagram &mdash; the part that writes active video into external memory and reads it back at display time &mdash; is the <strong>Video DMA</strong>. I am deliberately leaving its block diagram for the next post. This post was about pixels, timing, formats, backpressure and the test harness; the next one is about frame ownership.</p>
+
+                    <p>The key transition is from <em>line elasticity</em> to <em>frame ownership</em>. FIFOs handle small timing differences. A VDMA handles complete frames. That is post #2.</p>
+
+                    <p>All of the blocks mentioned here are open source in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>, with a fuller written reference in <a href="https://github.com/nelsoncsc/verilaxi/blob/main/VIDEO.md">VIDEO.md</a>.</p>
+
+                    <h2 class="section-heading">References</h2>
+                    <p>[1] Keith Jack. <em>Video Demystified: a Handbook for the Digital Engineer</em>. Elsevier, 2011.</p>
+                    <p>[2] verilaxi &mdash; a Verilator-friendly SystemVerilog video &amp; DMA library. <a href="https://github.com/nelsoncsc/verilaxi">github.com/nelsoncsc/verilaxi</a></p>
+                    <p>[3] Nelson Campos. <a href="rgb2ycbcr.html">RGB to YCbCr conversion</a> &mdash; fixed-point colour conversion with shifts and adders.</p>
+                    <p>[4] Nelson Campos. <a href="sobel.html">Sobel edge detector</a> &mdash; a simple image-processing block where luma and edges matter.</p>
+                    <p>[5] Nelson Campos. <a href="isp_uvm.html">ISP verification with UVM</a> &mdash; image-processing verification context.</p>
+                    <p>[6] Nelson Campos. <a href="fifo_cdc.html">Synchronous and Asynchronous FIFOs in Hardware</a> &mdash; the CDC primitive behind video elasticity.</p>
+                    <p>[7] Nelson Campos. <a href="axi_dma.html">AXI DMA and CDMA</a> &mdash; the memory-movement foundation for the next VDMA post.</p>
+                    <p>[8] Nelson Campos. <a href="axi_vip.html">Building SystemVerilog AXI VIP</a>.</p>
+                    <p>[9] Nelson Campos. <a href="axi_sva.html">SVA Protocol Checkers for AXI</a>.</p>
+                    <p>[10] Nelson Campos. <a href="verilator_tb.html">Verilator testbenches</a>.</p>
+
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelsoncscampos@gmail.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://br.linkedin.com/in/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-circle fa-linkedin-color fa-stack-2x stacked-line-height"></i>
+                                    <i class="fa fa-linkedin fa-stack-1x fa-inverse stacked-line-height-2"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- jQuery -->
+    <script src="js/jquery.js"></script>
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+    <!-- Custom Theme JavaScript -->
+    <script src="js/clean-blog.min.js"></script>
+
+</body>
+
+</html>

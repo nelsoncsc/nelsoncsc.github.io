@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-79921848-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="sistenix.com - Video DMA explained: S2MM/MM2S engines, triple-buffer frame store, genlock and tearing, frame delay, park mode, telemetry, and a multi-tap temporal VDMA that exposes several past frames at once.">
+    <meta name="keywords" content="VDMA, video DMA, triple buffer, frame store, genlock, tearing, frame delay, park mode, S2MM, MM2S, AXI4, temporal VDMA, multi-tap, motion detection, SystemVerilog, verilaxi">
+    <meta name="author" content="Nelson Campos">
+
+
+    <link rel="shortcut icon" href="img/icone2.ico" />
+    <title>Video DMA: triple-buffering, genlock and temporal taps</title>
+
+
+    <link rel="canonical" href="https://sistenix.com/vdma.html">
+<!-- Bootstrap Core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="css/clean-blog.min.css" rel="stylesheet">
+
+    <!-- Custom Fonts -->
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <!-- SEO: article metadata -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Video DMA: triple-buffering, genlock and temporal taps">
+    <meta property="og:description" content="Video DMA explained for hardware engineers: S2MM/MM2S engines, strided frame addressing, triple buffering, genlock, frame delay, multi-tap temporal VDMA, throughput, and Verilaxi tests.">
+    <meta property="og:url" content="https://sistenix.com/vdma.html">
+    <meta property="og:site_name" content="sistenix.com">
+    <meta property="og:image" content="https://sistenix.com/img/verilaxi/vdma_taps_diff.png">
+    <meta property="article:published_time" content="2026-06-28T12:00:00+00:00">
+    <meta property="article:modified_time" content="2026-06-28T12:00:00+00:00">
+    <meta property="article:author" content="Nelson Campos">
+    <meta property="article:section" content="Hardware Design">
+    <meta property="article:tag" content="VDMA">
+    <meta property="article:tag" content="AXI DMA">
+    <meta property="article:tag" content="genlock">
+    <meta property="article:tag" content="optical flow">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Video DMA: triple-buffering, genlock and temporal taps">
+    <meta name="twitter:description" content="Video DMA explained for hardware engineers: S2MM/MM2S engines, strided frame addressing, triple buffering, genlock, frame delay, multi-tap temporal VDMA, throughput, and Verilaxi tests.">
+    <meta name="twitter:image" content="https://sistenix.com/img/verilaxi/vdma_taps_diff.png">
+    <link rel="prev" href="https://sistenix.com/video_basics.html">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Video DMA: triple-buffering, genlock and temporal taps",
+      "description": "Video DMA explained for hardware engineers: S2MM/MM2S engines, strided frame addressing, triple buffering, genlock, frame delay, multi-tap temporal VDMA, throughput, and Verilaxi tests.",
+      "image": "https://sistenix.com/img/verilaxi/vdma_taps_diff.png",
+      "url": "https://sistenix.com/vdma.html",
+      "datePublished": "2026-06-28T12:00:00+00:00",
+      "dateModified": "2026-06-28T12:00:00+00:00",
+      "author": {"@type": "Person", "name": "Nelson Campos", "url": "https://github.com/nelsoncsc"},
+      "publisher": {"@type": "Organization", "name": "sistenix.com", "url": "https://sistenix.com"},
+      "mainEntityOfPage": {"@type": "WebPage", "@id": "https://sistenix.com/vdma.html"},
+      "keywords": "VDMA, video DMA, triple buffer, genlock, temporal taps, optical flow, AXI4, SystemVerilog, Verilator, verilaxi"
+    }
+    </script>
+    <!-- /SEO: article metadata -->
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="/">Nelson Campos</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="https://github.com/nelsoncsc/verilaxi">Verilaxi</a></li>
+                    <li><a href="https://github.com/nelsoncsc/nelsoncsc">About</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <header class="intro-header" style="background-image: url('img/post-bg2.jpg')">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <div class="post-heading">
+                        <h1>Video DMA</h1>
+                        <h2 class="subheading">Triple-buffering, genlock, and reading the past with temporal taps</h2>
+                        <span class="meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on June 28, 2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Post Content -->
+    <article>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+
+<h2 class="section-heading">Motivation</h2>
+
+<p>
+In the <a href="video_basics.html">previous post</a> [7] we followed a single pixel from a camera onto an AXI-Stream bus. That is enough to <em>move</em> video, but not to <em>do</em> anything useful with it. The moment you want to store a frame, scale it, overlay it, or run a filter that looks at more than one pixel at a time, you need the whole frame sitting in memory &mdash; and a frame is far too big for on-chip RAM. A single 1080p frame is about 6&nbsp;MB; you are not keeping that in block RAM.
+</p>
+
+<p>
+So video frames live in DDR, and something has to shovel them in and out: capture writes incoming frames to memory, display reads them back. That component is the <strong>Video DMA</strong>. It is not a generic memory copier &mdash; it is a frame-level traffic manager that has to solve one specific problem that an ordinary DMA never faces: the writer and the reader are <em>independent</em>. They run on different clocks, at different rates, and neither will wait for the other. If they ever touch the same buffer at the same time, the screen tears.
+</p>
+
+<p>
+This post takes <code>snix_axi_vdma</code> from <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a> apart engine by engine, then shows how a small change to its frame store turns it into something more powerful: a <strong>multi-tap temporal VDMA</strong> that hands you several past frames at the same instant, which is exactly what temporal filters and motion detectors need.
+</p>
+
+<h2 class="section-heading">Two engines, pointing in opposite directions</h2>
+
+<p>
+A VDMA is really two <a href="axi_dma.html">DMA engines</a> [8] that share a pool of buffers:
+</p>
+
+<ul>
+  <li><strong>S2MM</strong> (<em>stream to memory-mapped</em>) &mdash; the capture engine. It takes an AXI-Stream of pixels and writes one frame into DDR over an AXI4 write master.</li>
+  <li><strong>MM2S</strong> (<em>memory-mapped to stream</em>) &mdash; the playback engine. It reads a frame from DDR over an AXI4 read master and presents it as an AXI-Stream to the display path.</li>
+</ul>
+
+<p>
+Each engine is a small state machine that walks a frame one line at a time. The S2MM, for example, only accepts pixels when it is genuinely ready to write them, and that readiness is one expression:
+</p>
+
+<pre><code>assign s_axis_tready = fifo_s_tready &amp;&amp; frame_busy &amp;&amp;
+                       (state == ACTIVE) &amp;&amp;
+                       (input_line &lt; frame_vsize_lines);</code></pre>
+
+<p>
+Read it right to left and it tells you the whole contract. The engine only pulls a pixel when its internal line FIFO has room (<code>fifo_s_tready</code>), <em>and</em> a frame is in progress (<code>frame_busy</code>), <em>and</em> the FSM is in its active streaming state, <em>and</em> it has not already received all the lines it was told to expect. Drop any one of those and <code>tready</code> falls, which is how a downstream engine applies backpressure all the way back to the source without a single explicit control signal.
+</p>
+
+<h2 class="section-heading">What makes it different from a plain DMA</h2>
+
+<p>
+It is worth being precise about why a VDMA is its own thing and not just an <a href="axi_dma.html">AXI DMA</a> [8] with a video label. A plain DMA &mdash; and the related <a href="axi_dma.html">CDMA</a> [8], which copies memory to memory &mdash; performs a <strong>one-dimensional</strong> transfer: a base address and a byte count. Bytes are contiguous; you point it at a buffer and it streams from start to end.
+</p>
+
+<p>
+A frame is not contiguous. It is a <strong>two-dimensional</strong> object: a rectangle of <code>HSIZE</code> bytes by <code>VSIZE</code> lines, laid out in memory with a <code>STRIDE</code> &mdash; the distance from the start of one line to the start of the next &mdash; that is usually <em>larger</em> than the line itself, so each line begins on a clean address boundary. A VDMA therefore runs a nested loop the plain DMA never has: an outer loop over lines and an inner loop over bursts within a line, with an address that jumps by <code>STRIDE</code> at every line boundary. On top of that 2D address generator sit the three things a plain DMA has no concept of: a multi-buffer frame store, genlock, and frame-rate decoupling between writer and reader.</p>
+
+<table class="table table-bordered">
+  <thead><tr><th></th><th>Plain DMA</th><th>CDMA</th><th>VDMA</th></tr></thead>
+  <tbody>
+    <tr><td>Transfer shape</td><td>1D, contiguous</td><td>1D, contiguous</td><td>2D: hsize &times; vsize, strided</td></tr>
+    <tr><td>Endpoints</td><td>stream &harr; memory</td><td>memory &harr; memory</td><td>stream &harr; memory, per frame</td></tr>
+    <tr><td>Address generation</td><td>linear</td><td>linear</td><td>per-line base + intra-line bursts</td></tr>
+    <tr><td>Buffering</td><td>one region</td><td>one region</td><td>triple buffer + age tracking</td></tr>
+    <tr><td>Sync</td><td>start/done</td><td>start/done</td><td>genlock, frame delay, park</td></tr>
+  </tbody>
+</table>
+<p>Table (1): a VDMA is a 2D, frame-aware DMA. The datapath primitives (bursts, outstanding requests, a line FIFO) are shared with the plain DMA; the addressing and the frame-level semantics are what is new.</p>
+
+<h2 class="section-heading">The two state machines</h2>
+
+<p>
+The capture engine is the simpler of the two. It has three states, and it is &ldquo;busy&rdquo; from the moment a frame starts until the very last write response drains back:
+</p>
+
+<table class="table table-bordered">
+  <thead><tr><th>S2MM state</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>IDLE</code></td><td>Wait for <code>frame_start</code>; latch base address, stride, geometry; flag <code>config_error</code> if hsize or vsize is zero.</td></tr>
+    <tr><td><code>ACTIVE</code></td><td>Issue <code>AW</code> bursts and push <code>W</code> data from the line FIFO; advance the line address as each line completes; retire bursts as <code>BRESP</code> returns.</td></tr>
+    <tr><td><code>ABORT</code></td><td>Entered on <code>frame_stop</code> or error; stop issuing new bursts but keep draining outstanding <code>B</code> responses so the bus is left clean.</td></tr>
+  </tbody>
+</table>
+<p>Table (2): the S2MM capture FSM. The frame is only declared done when the schedule is complete <em>and</em> every outstanding burst has been acknowledged.</p>
+
+<p>
+The playback engine looks almost identical but has a <strong>fourth state</strong>, and that extra state is the whole reason reads are harder than writes:
+</p>
+
+<table class="table table-bordered">
+  <thead><tr><th>MM2S state</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>IDLE</code></td><td>Wait for <code>frame_start</code>; latch geometry; round the line length up to a whole number of beats.</td></tr>
+    <tr><td><code>ACTIVE</code></td><td>Issue <code>AR</code> bursts ahead of the consumer; returned <code>R</code> data lands in the line FIFO and drains to the AXI-Stream output.</td></tr>
+    <tr><td><code>WAIT_OUTPUT</code></td><td>All addresses issued and all bursts returned, but the FIFO still holds pixels. Keep streaming until the last beat of the last line has actually left.</td></tr>
+    <tr><td><code>ABORT</code></td><td>Entered on <code>frame_stop</code> or a bad <code>RRESP</code>; drain in-flight reads, then finish.</td></tr>
+  </tbody>
+</table>
+<p>Table (3): the MM2S playback FSM. The <code>WAIT_OUTPUT</code> state exists because a read engine&rsquo;s address side runs <em>far ahead</em> of its data side.</p>
+
+<p>
+Why does only the reader need <code>WAIT_OUTPUT</code>? Because the two engines are asymmetric in time. On the write side, issuing the address and pushing the data happen close together &mdash; when the last <code>W</code> beat with <code>WLAST</code> goes out, the frame is essentially written. On the read side, the engine deliberately issues all its <code>AR</code> addresses long before the corresponding <code>R</code> data comes back, and the display then drains that data slowly at its own rate. So &ldquo;all reads issued&rdquo; and &ldquo;all pixels delivered&rdquo; are two very different moments, sometimes thousands of cycles apart. The engine must not declare <code>frame_done</code> at the first; it waits, in <code>WAIT_OUTPUT</code>, for the second:
+</p>
+
+<pre><code>WAIT_OUTPUT: begin
+    if (output_complete) begin     // last beat of last line has left
+        frame_busy <= 1'b0;
+        frame_done <= 1'b1;
+        state      <= IDLE;
+    end
+end</code></pre>
+
+<h2 class="section-heading">Two-dimensional address generation</h2>
+
+<p>
+A frame on the AXI side is pure <strong>geometry</strong> in bytes: <code>HSIZE</code> bytes per line, <code>VSIZE</code> lines, and a <code>STRIDE</code> from one line to the next. The byte address of any burst is therefore
+</p>
+
+<div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">addr(line, offset) = frame_addr + line &times; STRIDE + offset
+
+   0 &le; offset &lt; HSIZE        (position inside the current line)
+   STRIDE &ge; HSIZE            (the slack is inter-line padding)</pre></div>
+<p>The address has two independent terms: a coarse one that steps by <code>STRIDE</code> per line, and a fine one that steps by the burst size within a line.</p>
+
+<p>
+In the RTL this is two registers. <code>next_write_addr</code> walks the fine offset, advancing by the bytes just issued; <code>line_addr</code> holds the start of the current line and jumps by <code>STRIDE</code> only when a line finishes:
+</p>
+
+<pre><code>if (aw_fire) begin
+    next_write_addr &lt;= next_write_addr + burst_bytes;   // fine: within a line
+    if (remaining_after_burst == 0) begin               // line finished
+        line_bytes_remaining &lt;= frame_hsize_bytes;      // reload the line
+        line_addr       &lt;= line_addr + frame_stride;    // coarse: next line
+        next_write_addr &lt;= line_addr + frame_stride;
+    end
+end</code></pre>
+
+<p>
+This is exactly the nested loop a plain DMA never runs. Note the reload: <code>line_bytes_remaining</code> resets to <code>HSIZE</code> at every line, and the base jumps by <code>STRIDE</code>, not by <code>HSIZE</code> &mdash; the difference between the two is the padding that keeps each line aligned. One small asymmetry between the engines hides here: the reader rounds the line length <em>up</em> to a whole number of beats (<code>aligned_line_bytes</code>) so it always fetches complete beats, while the writer keeps the exact byte count and trims the final beat with <code>WSTRB</code>. Reads are beat-aligned; writes are byte-exact.
+</p>
+
+<h2 class="section-heading">Sizing a burst: the 4&nbsp;KB rule</h2>
+
+<p>
+Within a line the engine wants the longest legal burst it can issue, because long bursts amortise the address-phase overhead. Three limits decide the actual length, and the hardware simply takes the smallest:
+</p>
+
+<div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">max_burst_bytes = (burst_len + 1) &times; 2^beat_size      // the programmed cap
+bytes_to_4k     = 4096 &minus; (addr mod 4096)             // distance to the next 4 KB line
+line_remaining  = bytes left in the current line
+
+burst_bytes     = min(max_burst_bytes, bytes_to_4k, line_remaining)
+burst_len_out   = ceil(burst_bytes / bytes_per_beat) &minus; 1   // the AWLEN/ARLEN value</pre></div>
+
+<p>
+The middle term is the one beginners forget: <a href="amba.html">AXI4</a> [9] forbids a burst from crossing a 4&nbsp;KB address boundary [2], because that is the granularity at which addresses may be remapped downstream. If a burst would straddle a 4&nbsp;KB line, it must be split at the boundary. The RTL computes the distance to the next boundary and clamps to it:
+</p>
+
+<pre><code>assign bytes_to_4k = (max_burst_bytes + next_write_addr[11:0] &gt;= 4096)
+                     ? (4096 - next_write_addr[11:0])   // would cross: clamp
+                     : max_burst_bytes;                  // fits: no clamp
+
+always_comb begin
+    burst_bytes = max_burst_bytes;
+    if (bytes_to_4k       &lt; burst_bytes) burst_bytes = bytes_to_4k;
+    if (line_bytes_remaining[14:0] &lt; burst_bytes) burst_bytes = line_bytes_remaining[14:0];
+    burst_awlen = compute_next_len(burst_bytes, beat_size); // bytes -> AWLEN
+end</code></pre>
+
+<p>
+<code>compute_num_bytes</code> turns an <code>(AWLEN, AWSIZE)</code> pair into a byte count by the identity <code>(len+1) &lt;&lt; size</code>; <code>compute_next_len</code> does the inverse, dividing a byte count by the beat width and subtracting one. They are the two halves of the same conversion, and keeping them exact is what lets the engine emit a legal <code>AWLEN</code> for any geometry, including the ragged final burst of a line.
+</p>
+
+<h2 class="section-heading">Pipelined bursts: hiding memory latency</h2>
+
+<p>
+A single burst, issued and then waited on, would leave the bus idle for the entire memory round-trip. The fix is to keep several bursts <em>in flight</em>: issue the next address while earlier data is still arriving. Both engines cap this at four outstanding bursts, but the read engine needs one extra piece of bookkeeping, because read data arrives unbidden and must have somewhere to land.
+</p>
+
+<p>
+The MM2S therefore runs a <strong>credit system</strong> against its line FIFO. Every time it issues a read it <em>reserves</em> the beats that read will eventually return; every time a beat leaves the output it releases one. It refuses to issue a read whose data would not fit:
+</p>
+
+<pre><code>// reserve on issue, release on output
+reserved_beats_next = reserved_beats
+                    + (ar_fire     ? burst_beats : 0)
+                    - (output_fire ? 1           : 0);
+
+// only issue if it still fits the FIFO, and &lt; 4 bursts are in flight
+assign can_issue_ar = frame_busy &amp;&amp; !schedule_complete &amp;&amp; !ar_gap &amp;&amp;
+                      (line_bytes_remaining != 0) &amp;&amp;
+                      (outstanding_bursts &lt; MAX_OUTSTANDING) &amp;&amp;
+                      (reserved_beats + burst_beats &lt;= FIFO_DEPTH - 1);</code></pre>
+
+<p>
+That last line is the whole prefetch policy in one inequality. It guarantees the FIFO can never overflow &mdash; the engine never promises more beats than it has room for &mdash; while still running as far ahead as the FIFO allows. To actually hide the latency, the beats kept in flight must cover the memory round-trip. If the read latency is <code>L</code> cycles and each burst is <code>B</code> beats, then with <code>N</code> outstanding bursts you have up to <code>N &times; B</code> beats buffered, so sustained full bandwidth needs
+</p>
+
+<div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">N &times; B  &ge;  L            and        FIFO_DEPTH  &ge;  N &times; B</pre></div>
+
+<p>
+With <code>N = 4</code> and a 16-beat burst that is 64 beats of slack &mdash; comfortably more than a typical on-chip memory latency, which is why the engine can keep the data path busy. On real DDR, where <code>L</code> is larger and variable, this same inequality is the dial you turn: deeper FIFO, longer bursts, or more outstanding requests.
+</p>
+
+<h2 class="section-heading">The heart of it: the triple-buffer frame store</h2>
+
+<p>
+Now the real problem. The writer is filling a frame while the reader is emptying one. If they share a single buffer, the reader will display a frame that is half-overwritten &mdash; the top of one frame and the bottom of the next, with a visible horizontal seam. That seam is <strong>tearing</strong> [1].
+</p>
+
+<p>
+The classic fix is more buffers. With <strong>three</strong> slots the writer can always be filling one buffer, the reader can always be draining another, and there is a third spare so the two never collide even when their rates drift &mdash; the same triple-buffer and genlock model that Xilinx&rsquo;s AXI VDMA uses [3]. The frame store is the bookkeeper that rotates the writer through the slots while steering it away from whatever the reader is touching, and tracks which slot holds the newest finished frame (<code>newest_complete_slot</code>).
+</p>
+
+<p>
+Choosing which slot the reader plays back is a three-way priority, and the whole policy fits in one combinational block:
+</p>
+
+<pre><code>delayed_candidate = delayed_slot(newest_complete_slot, frame_delay);
+
+if (park_mode &amp;&amp; (park_slot &lt;= 2'd2) &amp;&amp; valid_slots[park_slot])
+    rd_candidate = park_slot;            // 1. park: freeze on a fixed buffer
+else if (valid_slots[delayed_candidate])
+    rd_candidate = delayed_candidate;    // 2. run N frames behind newest
+else if (valid_slots[newest_complete_slot])
+    rd_candidate = newest_complete_slot; // 3. otherwise, show the newest
+else
+    rd_candidate = read_slot;            // nothing new yet: hold</code></pre>
+
+<p>
+Three behaviours fall out of those four lines. <strong>Park mode</strong> nails the reader to one slot &mdash; a freeze-frame, or a diagnostic still. <strong>Frame delay</strong> lets the reader deliberately run zero, one, or two frames behind the newest capture, which gives the downstream pipeline breathing room before the writer is allowed to reclaim a buffer. And if nothing newer is ready, the reader simply holds its current slot rather than showing garbage.
+</p>
+
+<h2 class="section-heading">Genlock: why playback waits for capture</h2>
+
+<p>
+Frame delay decides <em>which</em> slot; <strong>genlock</strong> decides <em>when</em> playback is allowed to advance. With genlock enabled, the MM2S does not restart a frame on its own schedule &mdash; it restarts only after the S2MM signals that a new capture frame has completed. Capture becomes the metronome and display follows it, so the two are locked in step and a half-written buffer can never be selected for display. This is the difference between a demo that looks fine on a logic analyser and one that looks fine on a monitor.
+</p>
+
+<h2 class="section-heading">Telling you when it goes wrong</h2>
+
+<p>
+Because the writer and reader are independent, a real system will occasionally misbehave, and the VDMA is honest about it. It keeps small saturating counters for the three things that actually matter:
+</p>
+
+<ul>
+  <li><strong>overwrite</strong> &mdash; the writer caught up to an unread buffer (the reader is too slow),</li>
+  <li><strong>underrun</strong> &mdash; the reader needed a frame that was not ready (the writer is too slow),</li>
+  <li><strong>sync-loss</strong> &mdash; a genlock event arrived while the reader was mid-frame.</li>
+</ul>
+
+<p>
+On top of that, any non-OKAY AXI response (<code>BRESP</code>/<code>RRESP</code>) sets a sticky fault flag, and a frame that faulted mid-write is <em>suppressed</em> &mdash; it is never published to the frame store, so the reader will never latch onto a corrupt buffer. The whole status surface is mirrored into one read-only register.
+</p>
+
+<h2 class="section-heading">The register map</h2>
+
+<p>
+Software drives all of this through a 16-register <a href="axi_csr.html">AXI-Lite register bank</a> [10]. The control plane is small on purpose &mdash; geometry, three buffer addresses, and a control word per direction.
+</p>
+
+<table class="table table-bordered">
+  <thead><tr><th>Offset</th><th>Register</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>0x00 / 0x0C</code></td><td><code>WR_CTRL</code> / <code>RD_CTRL</code></td><td>start / stop / circular, AXI beat size and burst length</td></tr>
+    <tr><td><code>0x08 / 0x14</code></td><td><code>WR_STRIDE</code> / <code>RD_STRIDE</code></td><td>line stride in bytes</td></tr>
+    <tr><td><code>0x1C / 0x20</code></td><td><code>WR_HSIZE</code> / <code>WR_VSIZE</code></td><td>capture geometry (bytes per line, lines)</td></tr>
+    <tr><td><code>0x24 / 0x28</code></td><td><code>RD_HSIZE</code> / <code>RD_VSIZE</code></td><td>playback geometry</td></tr>
+    <tr><td><code>0x2C &hellip; 0x34</code></td><td><code>FRAME_ADDR0..2</code></td><td>the three buffer base addresses</td></tr>
+    <tr><td><code>0x18</code></td><td><code>STATUS</code></td><td>read-only: busy/done, slots, genlock, telemetry counters</td></tr>
+    <tr><td><code>0x38</code></td><td><code>FRAME_CTRL</code></td><td>frame-store enable, genlock, frame_delay, park, IRQ enables</td></tr>
+    <tr><td><code>0x3C</code></td><td><code>IRQ_ACK</code></td><td>acknowledge interrupt / clear faults / clear telemetry</td></tr>
+  </tbody>
+</table>
+<p>Table (4): the <code>snix_axi_vdma</code> register map. <code>FRAME_CTRL</code> is where the personality of the engine is set &mdash; bit&nbsp;0 enables the triple buffer, bit&nbsp;4 enables genlock, bits&nbsp;[6:5] set the frame delay, and bits&nbsp;[3:1] select park mode and slot.</p>
+
+<p>
+Bringing it up in frame-store mode with genlock is just a handful of writes &mdash; addresses, geometry, then arm both engines:
+</p>
+
+<pre><code>write_reg(FRAME_ADDR0, 0x1000_0000);
+write_reg(FRAME_ADDR1, 0x1010_0000);
+write_reg(FRAME_ADDR2, 0x1020_0000);
+write_reg(WR_HSIZE, 1920*BPP);  write_reg(WR_VSIZE, 1080);
+write_reg(RD_HSIZE, 1920*BPP);  write_reg(RD_VSIZE, 1080);
+write_reg(FRAME_CTRL, FRAME_STORE_EN | GENLOCK_EN | FRAME_DELAY(0) | IRQ_WR);
+write_reg(WR_CTRL, BURST16 | BEAT8 | CIRCULAR | START);
+write_reg(RD_CTRL, BURST16 | BEAT8 | START);</code></pre>
+
+<p>
+Put the engines, the frame store, and the CSR together and this is the block that results &mdash; capture on the top lane, playback on the bottom, the shared triple buffer in the middle:
+</p>
+
+<a href="img/verilaxi/snix_axi_vdma.svg"><img src="img/verilaxi/snix_axi_vdma.svg" class="img-responsive center-block" alt="snix_axi_vdma block diagram"></a>
+<span class="caption text-muted">Figure (1): <code>snix_axi_vdma</code>. The S2MM FSM writes captured frames into the shared frame memory; the MM2S FSM reads them back; the frame store decides which slot each engine touches, and the CSR programs genlock, frame delay and park through <code>FRAME_CTRL</code>.</span>
+
+<h2 class="section-heading">Why read several frames at once: temporal filters</h2>
+
+<p>
+Everything so far moves <em>one</em> frame. But a whole class of video algorithms is defined over <em>time</em>: the output pixel depends not just on the current frame but on the same pixel in previous frames. These are <strong>temporal filters</strong>, and in general they compute
+</p>
+
+<div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">y(x, t) = f( I(x, t), I(x, t-1), I(x, t-2), ... )</pre></div>
+
+<p>
+The family is large and useful. <strong>Temporal denoising</strong> averages a pixel across consecutive frames, which beats spatial blur because it does not soften edges &mdash; static detail reinforces while noise, being uncorrelated in time, cancels. <strong>Motion detection</strong> subtracts consecutive frames: whatever is still vanishes, whatever moved lights up. <strong>Frame-rate conversion</strong> interpolates a synthetic frame between two real ones. <strong>3D noise reduction</strong> (3DNR), found in nearly every ISP, blends a spatial filter with a temporal one. All of them share a hard requirement: they need frame <em>N</em>, frame <em>N&minus;1</em>, and sometimes <em>N&minus;2</em> <strong>at the same instant</strong>, <strong>pixel-aligned</strong> &mdash; pixel <code>(x,y)</code> of each frame arriving together, in the same scan order.
+</p>
+
+<p>
+A single VDMA cannot do this. It exposes exactly one frame at a time. You could bolt on external line buffers, but for full frames that is megabytes of storage you do not have on chip. The clean answer is to reuse the buffers already sitting in DDR: the frame store is <em>already</em> keeping several recent frames alive: it just needs to hand out more than one of them at once.
+</p>
+
+<h2 class="section-heading">The frame buffers</h2>
+
+<p>
+For <code>N</code> taps the store holds <strong>N+1 physical buffers</strong> in memory (<code>FRAME_ADDR0 &hellip; ADDR_N</code>). At any moment one buffer is being written and up to <code>N</code> are being read, which is why there must be one more buffer than taps: the <code>+1</code> is the spare that guarantees the writer always has somewhere to go that no reader is touching. The buffers themselves never move. What rotates is the <em>role</em> each buffer plays &mdash; writer, newest, previous, oldest &mdash; and that role assignment is the job of two cooperating schedulers.
+</p>
+
+<h2 class="section-heading">The slot schedulers</h2>
+
+<p>
+<strong>The write scheduler</strong> picks the next buffer to fill. The rule is one line: advance to the next slot that no tap has locked.
+</p>
+
+<pre><code>function automatic logic [1:0] next_wr_slot(input logic [1:0] current,
+                                            input logic [3:0] locked);
+    logic [1:0] c;
+    c = (current == NS-1) ? 0 : current + 1;     // step forward, wrapping
+    if (locked[c]) c = (c == NS-1) ? 0 : c + 1;  // skip a locked slot
+    if (locked[c]) c = (c == NS-1) ? 0 : c + 1;  // (unrolled so Yosys
+    if (locked[c]) c = (c == NS-1) ? 0 : c + 1;  //  can elaborate it)
+    next_wr_slot = c;
+endfunction</code></pre>
+
+<p>
+<strong>The read scheduler</strong> is an <em>age queue</em> &mdash; a tiny shift register of slot indices, ordered newest-first. When a capture completes, the just-finished slot enters at position 0 and everything older shifts down by one:
+</p>
+
+<pre><code>if (wr_frame_done) begin
+    valid_slots[write_slot] &lt;= 1'b1;
+    overwrite_event         &lt;= valid_slots[write_slot]; // reader fell behind
+    for (int i = NUM_TAPS-1; i &gt; 0; i--) begin
+        age[i]       &lt;= age[i-1];      // shift the queue down
+        valid_age[i] &lt;= valid_age[i-1];
+    end
+    age[0]     &lt;= write_slot;          // newest frame enters at the head
+    valid_age[0] &lt;= 1'b1;
+    write_slot &lt;= next_wr_slot(write_slot, slot_read_locked);
+end</code></pre>
+
+<p>
+With the queue in place, the address each tap reads is simply the slot sitting at its age position &mdash; tap <code>i</code> reads <code>age[i]</code>. That one indirection is the whole temporal trick:
+</p>
+
+<pre><code>tap 0   = age[0] = newest complete frame   (frame N)
+tap 1   = age[1] = previous frame          (frame N-1)
+tap N-1 = age[N-1] = oldest retained frame (frame N-(N-1))
+
+rd_frame_addr[i] = frame_addr[ age[i] ];   // tap i -> its aged slot</code></pre>
+
+<p>
+The two schedulers are coupled by a <strong>per-tap lock</strong>. While a tap is reading, it pins its slot so the write scheduler cannot reclaim it mid-read; the lock is taken when the tap starts and released only when it finishes:
+</p>
+
+<pre><code>if (rd_frame_start[i] &amp;&amp; valid_age[i]) begin
+    tap_rd_lock[i]    &lt;= 1'b1;
+    rd_locked_slot[i] &lt;= age[i];   // tap i pins the frame at its age
+end else if (rd_frame_done[i]) begin
+    tap_rd_lock[i] &lt;= 1'b0;        // released only when the read finishes
+end</code></pre>
+
+<p>
+That lock is the one sharp edge. Because the hardware is elaborated for a fixed number of taps, a start pulse fires <em>every</em> tap. If your design consumes only some of them and leaves the others' <code>tready</code> low, those taps never finish, never release their lock, and eventually starve the writer of a free slot. The rule is simple: if a tap is enabled, you must drain it. An undriven tap is not free &mdash; it is a held buffer. One more guard completes the picture: <code>rd_taps_available</code> only rises once all <code>N</code> ages are valid, so the taps cannot start handing out frames until the store has actually captured <code>N</code> distinct ones.
+</p>
+
+<h2 class="section-heading">Getting N engines</h2>
+
+<p>
+The read side is then just the single-VDMA MM2S, replicated. There is no special multi-port read engine &mdash; the top level instantiates <code>N</code> ordinary <code>snix_axi_vdma_mm2s</code> blocks in a <code>generate</code> loop, and wires tap <code>i</code> to its aged address from the scheduler:
+</p>
+
+<pre><code>generate
+    for (genvar i = 0; i &lt; NUM_TAPS; i++) begin : g_mm2s
+        // each tap reads the slot the age queue assigned to it
+        assign tap_rd_addr = rd_frame_addr_flat[i*ADDR_WIDTH +: ADDR_WIDTH];
+
+        snix_axi_vdma_mm2s #(.DATA_WIDTH(DATA_WIDTH), ...) u_mm2s (
+            .frame_start(rd_frame_start[i]),
+            .frame_addr (tap_rd_addr),
+            .m_axis_tdata(m_axis_tdata[i*DATA_WIDTH +: DATA_WIDTH]),
+            .mm2s_araddr (mm2s_araddr [i*ADDR_WIDTH +: ADDR_WIDTH]),
+            ... // one full AXI4 read master per tap
+        );
+    end
+endgenerate</code></pre>
+
+<p>
+Each tap therefore brings its own line FIFO, its own 4-deep outstanding-read pipeline, and its own AXI-Stream output &mdash; everything from the single-VDMA section, <code>N</code> times over. The <code>N</code> read masters plus the one write master are arbitrated onto the single memory by an external <a href="axi_arbiter.html">AXI crossbar</a> [11]. All the array ports are flat-packed (element <code>i</code> at <code>[i*W +: W]</code>) so the whole thing still elaborates cleanly through Yosys. Changing <code>NUM_TAPS</code> from 1 to 3 is a one-parameter change; the schedulers, the lock aggregation, and the generate loop all scale with it.
+</p>
+
+<a href="img/verilaxi/snix_axi_multi_vdma.svg"><img src="img/verilaxi/snix_axi_multi_vdma.svg" class="img-responsive center-block" alt="snix_axi_multi_vdma block diagram"></a>
+<span class="caption text-muted">Figure (2): <code>snix_axi_multi_vdma</code> with two taps. The capture side is unchanged from the single VDMA; the read side fans out into N independent MM2S masters, each with its own AXI-Stream output, arbitrated onto the memory by an AXI crossbar. <code>read_slot</code> now resolves per tap, by age.</span>
+
+<h2 class="section-heading">How fast can it go?</h2>
+
+<p>
+The ceiling is one beat per clock. With a <code>DATA_WIDTH</code>-bit data path running at the AXI clock, the peak bandwidth is
+</p>
+
+<div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">BW_peak = (DATA_WIDTH / 8) &times; f_AXI
+
+   64-bit @ 200 MHz  =  8 &times; 200e6  =  1.6 GB/s   per engine</pre></div>
+
+<p>
+A frame needs a fixed number of useful beats &mdash; <code>ceil(HSIZE / bytes_per_beat) &times; VSIZE</code> &mdash; and the engine&rsquo;s job is to deliver them in as few cycles as possible. Real efficiency is therefore
+</p>
+
+<div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">&eta; = useful_beats / total_cycles = 1 / (1 + bubbles / useful_beats)</pre></div>
+
+<p>
+The bubbles come from three places, and naming them tells you how to shrink them. First, the address handshake leaves a one-cycle gap after each <code>AW</code>/<code>AR</code> fire (<code>aw_gap</code>/<code>ar_gap</code> in the RTL), so addresses go out at most every other cycle &mdash; harmless as long as bursts are long enough that data keeps flowing in between. Second, every line boundary costs a short turnaround while the address jumps by <code>STRIDE</code> and the first beats of the new line are fetched. Third, if the FIFO ever runs dry at a burst boundary the output stalls until it refills. All three shrink with longer bursts and a deeper FIFO, which is exactly the <code>N &times; B &ge; L</code> lever from the previous section.
+</p>
+
+<p>
+In simulation against a behavioural memory the MM2S sustains about <strong>88%</strong> and the S2MM about <strong>86%</strong> of peak on a 64&times;32 frame &mdash; the missing fraction is almost entirely per-line and per-burst turnaround, not a structural stall. Those numbers are an optimistic bound: the model answers reads instantly, so they isolate the engine from memory behaviour. On real DDR the latency <code>L</code> grows and varies, and the same efficiency equation, with the same three bubble terms, is what you tune against.
+</p>
+
+<h2 class="section-heading">Proving it with a squirrel</h2>
+
+<p>
+A block diagram is a promise; a round-trip is proof. Using its <a href="axi_vip.html">task-based AXI BFMs</a> [12] inside a <a href="verilator_tb.html">Verilator harness</a> [13] &mdash; with the streams wrapped in <a href="axi_sva.html">SVA protocol checkers</a> [14] &mdash; verilaxi drives six real frames of the running squirrel through the capture path, lets the multi-tap VDMA stage them, and reads all the taps back out byte-for-byte. Because each tap is locked to a different age, on any given round the three taps return three consecutive frames of the animation &mdash; and subtracting two adjacent taps lights up exactly the pixels that moved:
+</p>
+
+<a href="img/verilaxi/vdma_taps_diff.png"><img src="img/verilaxi/vdma_taps_diff.png" class="img-responsive center-block" alt="Three temporal taps and their motion difference"></a>
+<span class="caption text-muted">Figure (3): the three taps on one round &mdash; frame N, N&minus;1, N&minus;2 &mdash; and the amplified difference of the first two. The bright regions are the squirrel's moving limbs and tail; the still background subtracts to black. That image <em>is</em> motion detection, produced for free by reading two taps of the same VDMA.</span>
+
+<p>
+The same test also instruments throughput. Reading a tap, the engine reports two efficiency numbers: a <em>steady</em> window (first delivered beat to last) and a <em>total</em> window (from the read request). In simulation the steady efficiency sits around 80% &mdash; the MM2S bubbles for a beat or so at each line and burst boundary while the FIFO refills, which is real RTL behaviour, not a frame-sized gap. The startup latency reads as zero only because the behavioural memory model answers instantly; on real DDR that gap is where the next round of optimisation lives. Being able to <em>see</em> that distinction, per frame, is the point of building the instrumentation into the test.
+</p>
+
+<h2 class="section-heading">A baseline for Lucas&ndash;Kanade optical flow</h2>
+
+<p>
+That difference image in Figure&nbsp;3 is not just a pretty demo &mdash; it is the first term of a real algorithm. <strong>Lucas&ndash;Kanade</strong> [4] is the classic method for <em>optical flow</em>: estimating, per pixel, the motion vector <code>(u, v)</code> between two frames. It rests on the brightness-constancy assumption [5] &mdash; a moving point keeps its intensity &mdash; which linearises into the optical-flow constraint
+</p>
+
+<div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">Ix &middot; u  +  Iy &middot; v  +  It  =  0</pre></div>
+
+<p>
+Here <code>Ix</code> and <code>Iy</code> are the <em>spatial</em> gradients (how brightness changes left-to-right and top-to-bottom within a frame) and <code>It</code> is the <em>temporal</em> gradient (how brightness changes between frames). One equation has two unknowns, so Lucas&ndash;Kanade assumes the flow is constant over a small window around each pixel and solves the resulting over-determined system by least squares &mdash; a 2&times;2 normal-equation solve built from sums of <code>Ix</code>, <code>Iy</code> and <code>It</code> products over the window. Inverting that 2&times;2 matrix comes down to a reciprocal of its determinant &mdash; exactly the fixed-point <a href="division.html">divider</a> [15] (and its sibling <a href="sqrt.html">square root</a> [16], for the eigenvalue corner test) that the earlier posts build:
+</p>
+
+<div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">[ &Sigma;Ix&sup2;   &Sigma;IxIy ] [ u ]   = - [ &Sigma;IxIt ]
+[ &Sigma;IxIy  &Sigma;Iy&sup2; ] [ v ]       [ &Sigma;IyIt ]</pre></div>
+
+<p>
+Now look at where the data comes from. The spatial gradients <code>Ix</code>, <code>Iy</code> are computed inside a single frame &mdash; a <a href="sobel.html">Sobel</a>-style spatial difference [17], exactly the kind of operator covered in the earlier posts. The temporal gradient is
+</p>
+
+<div style="background: #f8f8f8; overflow:auto; width:auto; border:solid gray; border-width:.1em .1em .1em .8em; padding:.2em .6em;"><pre style="margin: 0; line-height: 125%;">It(x, y) = I(x, y, t) - I(x, y, t-1)  =  tap0(x,y) - tap1(x,y)</pre></div>
+
+<p>
+which is precisely <code>tap0 &minus; tap1</code> &mdash; the difference image the multi-tap VDMA produced for free. This is the point of the whole exercise: an optical-flow engine spends most of its hardware budget not on arithmetic but on <em>getting two time-aligned frames to the same pixel at the same cycle</em>. The multi-tap VDMA <em>is</em> that front-end. It delivers <code>I(t)</code> and <code>I(t&minus;1)</code> &mdash; and <code>I(t&minus;2)</code> for a higher-order temporal derivative or a coarser pyramid level &mdash; pixel-aligned and in lockstep, so the gradient computation and the 2&times;2 solve can stream straight off the taps with no external frame buffering. Build the taps once and you have the data-delivery baseline for Lucas&ndash;Kanade, for 3DNR, for motion-compensated interpolation, and for any other temporal filter you care to put downstream. That is the next thing to build on top of this.
+</p>
+
+<h2 class="section-heading">Closing</h2>
+
+<p>
+A VDMA is what turns a stream of pixels into a frame buffer you can actually compute on. The single engine solves tearing with three buffers, genlock and frame delay; the multi-tap version reuses those same buffers to hand you the recent past, turning &ldquo;store a frame&rdquo; into &ldquo;remember the last few frames&rdquo; almost for free. Everything here &mdash; the engines, the frame store, the temporal taps, and the squirrel round-trip &mdash; is open source in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a> [6], with a fuller written reference in <a href="https://github.com/nelsoncsc/verilaxi/blob/main/VIDEO.md">VIDEO.md</a>.
+</p>
+
+<h2 class="section-heading">References</h2>
+<p>[1] Keith Jack. <em>Video Demystified: A Handbook for the Digital Engineer</em>. Elsevier, 2011.</p>
+<p>[2] ARM. <em>AMBA AXI and ACE Protocol Specification</em> (IHI 0022), AXI4. 2011.</p>
+<p>[3] Xilinx. <em>AXI Video Direct Memory Access (AXI VDMA) LogiCORE IP Product Guide</em>, PG020.</p>
+<p>[4] B. D. Lucas and T. Kanade. An Iterative Image Registration Technique with an Application to Stereo Vision. <em>Proc. IJCAI</em>, 1981.</p>
+<p>[5] B. K. P. Horn and B. G. Schunck. Determining Optical Flow. <em>Artificial Intelligence</em> 17, 1981.</p>
+<p>[6] verilaxi &mdash; a Verilator-friendly SystemVerilog video &amp; DMA library. <a href="https://github.com/nelsoncsc/verilaxi">github.com/nelsoncsc/verilaxi</a></p>
+<p>[7] Nelson Campos. <a href="video_basics.html">Video basics for hardware engineers</a>.</p>
+<p>[8] Nelson Campos. <a href="axi_dma.html">AXI DMA and CDMA</a>.</p>
+<p>[9] Nelson Campos. <a href="amba.html">AMBA AXI handshake basics</a>.</p>
+<p>[10] Nelson Campos. <a href="axi_csr.html">AXI-Lite CSR/register bank design</a>.</p>
+<p>[11] Nelson Campos. <a href="axi_arbiter.html">AXI arbiter and crossbar basics</a>.</p>
+<p>[12] Nelson Campos. <a href="axi_vip.html">Building SystemVerilog AXI VIP</a>.</p>
+<p>[13] Nelson Campos. <a href="verilator_tb.html">Verilator testbenches</a>.</p>
+<p>[14] Nelson Campos. <a href="axi_sva.html">SVA Protocol Checkers for AXI</a>.</p>
+<p>[15] Nelson Campos. <a href="division.html">Division in hardware</a>.</p>
+<p>[16] Nelson Campos. <a href="sqrt.html">Square root in hardware</a>.</p>
+<p>[17] Nelson Campos. <a href="sobel.html">Sobel edge detector</a>.</p>
+
+<hr>
+
+<p>Also available in <a href="https://github.com/nelsoncsc/verilaxi">GitHub</a>.</p>
+
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <hr>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                    <ul class="list-inline text-center">
+                        <li>
+                            <a href="mailto:nelsoncscampos@gmail.com">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-envelope fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://br.linkedin.com/in/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-circle fa-linkedin-color fa-stack-2x stacked-line-height"></i>
+                                    <i class="fa fa-linkedin fa-stack-1x fa-inverse stacked-line-height-2"></i>
+                                </span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/nelsoncsc">
+                                <span class="fa-stack fa-lg">
+                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="copyright text-muted">Copyright &copy; sistenix.com 2026</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- jQuery -->
+    <script src="js/jquery.js"></script>
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+    <!-- Custom Theme JavaScript -->
+    <script src="js/clean-blog.min.js"></script>
+
+</body>
+
+</html>

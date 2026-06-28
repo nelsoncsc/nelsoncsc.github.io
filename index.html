@@ -17,8 +17,8 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="sistenix.com - Technical articles on hardware design, verification, AXI, FIFOs, DMA, Verilator, and SystemVerilog.">
-    <meta name="keywords" content="hardware design, hardware verification, AXI, FIFO, DMA, Verilator, SystemVerilog, RTL, FPGA, ASIC">
+    <meta name="description" content="sistenix.com - Technical articles on hardware design, verification, AXI, FIFOs, DMA, Video DMA, video timing, Verilator, and SystemVerilog.">
+    <meta name="keywords" content="hardware design, hardware verification, AXI, FIFO, DMA, VDMA, Video DMA, video timing, AXI-Stream, Verilator, SystemVerilog, RTL, FPGA, ASIC">
     <meta name="author" content="Nelson Campos">
     
     <link rel="shortcut icon" href="img/icone2.ico" />
@@ -26,6 +26,16 @@
 
     
     <link rel="canonical" href="https://sistenix.com/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="sistenix.com - Hardware Design and Verification Blog">
+    <meta property="og:description" content="Technical articles on hardware design, verification, AXI, FIFOs, DMA, Video DMA, video timing, Verilator, and SystemVerilog.">
+    <meta property="og:url" content="https://sistenix.com/">
+    <meta property="og:site_name" content="sistenix.com">
+    <meta property="og:image" content="https://sistenix.com/img/chip.svg">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="sistenix.com - Hardware Design and Verification Blog">
+    <meta name="twitter:description" content="Technical articles on hardware design, verification, AXI, FIFOs, DMA, Video DMA, video timing, Verilator, and SystemVerilog.">
+
 <!-- Bootstrap Core CSS -->
     <link href="css/bootstrap.min.css" rel="stylesheet">
 
@@ -104,6 +114,32 @@
     <div class="container">
         <div class="row">
             <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+
+                    <div class="post-preview">
+                    <a href="vdma.html">
+                        <h2 class="post-title">
+                            Video DMA: triple-buffering, genlock and temporal taps
+                        </h2>
+                        <h3 class="post-subtitle">
+                            Staging whole frames through DDR without tearing &mdash; and reading the past with a multi-tap temporal VDMA
+                        </h3>
+                    </a>
+                    <p class="post-meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on June 28, 2026</p>
+                </div>
+                <hr>
+
+                    <div class="post-preview">
+                    <a href="video_basics.html">
+                        <h2 class="post-title">
+                            Video basics for hardware engineers
+                        </h2>
+                        <h3 class="post-subtitle">
+                            Pixels, YCbCr, chroma subsampling, video timing, the pixel clock, and the long road onto an AXI bus
+                        </h3>
+                    </a>
+                    <p class="post-meta">Posted by <a href="https://github.com/nelsoncsc/nelsoncsc">Nelson Campos</a> on June 28, 2026</p>
+                </div>
+                <hr>
 
                     <div class="post-preview">
                     <a href="uart_axil_master.html">
