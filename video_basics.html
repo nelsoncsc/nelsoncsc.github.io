@@ -507,7 +507,7 @@ needed_depth_pixels >= excess_pixel_rate * worst_case_stall_time
 </code></pre>
                     <p>This is not a replacement for a real bandwidth budget, but it is the right instinct: size the FIFO for the stall window you expect, not for wishful thinking.</p>
 
-                    <p>In a real design this FIFO is usually sized for elasticity, not for an entire frame. A few lines are often enough if the downstream memory path has bounded stalls. If the memory system can disappear for a full frame, the correct buffer is no longer a small FIFO in front of the pipeline &mdash; it is an external-memory problem. That is where the next post begins.</p>
+                    <p>In a real design this FIFO is usually sized for elasticity, not for an entire frame. A few lines are often enough if the downstream memory path has bounded stalls. If the memory system can disappear for a full frame, the correct buffer is no longer a small FIFO in front of the pipeline &mdash; it is an external-memory problem. That is where the <a href="vdma.html">Video DMA post</a> begins.</p>
 
                     <h2 class="section-heading">How the testbench proves the pipeline</h2>
 
@@ -626,9 +626,9 @@ assert (m_tlast == (received == 3));
                     </a>
                     <span class="caption text-muted">Figure (9): the verilaxi video pipeline &mdash; pixel clock on the edges, AXI clock in the middle.</span>
 
-                    <p>What sits in the middle of that diagram &mdash; the part that writes active video into external memory and reads it back at display time &mdash; is the <strong>Video DMA</strong>. I am deliberately leaving its block diagram for the next post. This post was about pixels, timing, formats, backpressure and the test harness; the next one is about frame ownership.</p>
+                    <p>What sits in the middle of that diagram &mdash; the part that writes active video into external memory and reads it back at display time &mdash; is the <strong><a href="vdma.html">Video DMA</a></strong>. Its architecture &mdash; the two engines, the triple-buffer frame store, genlock, and the multi-tap temporal taps &mdash; is the subject of <a href="vdma.html">its own post</a>. This post was about pixels, timing, formats, backpressure and the test harness; that one is about frame ownership.</p>
 
-                    <p>The key transition is from <em>line elasticity</em> to <em>frame ownership</em>. FIFOs handle small timing differences. A VDMA handles complete frames. That is post #2.</p>
+                    <p>The key transition is from <em>line elasticity</em> to <em>frame ownership</em>. FIFOs handle small timing differences. A VDMA handles complete frames. That is the subject of the <a href="vdma.html">Video DMA post</a>.</p>
 
                     <p>All of the blocks mentioned here are open source in <a href="https://github.com/nelsoncsc/verilaxi">verilaxi</a>, with a fuller written reference in <a href="https://github.com/nelsoncsc/verilaxi/blob/main/VIDEO.md">VIDEO.md</a>.</p>
 
@@ -639,10 +639,11 @@ assert (m_tlast == (received == 3));
                     <p>[4] Nelson Campos. <a href="sobel.html">Sobel edge detector</a> &mdash; a simple image-processing block where luma and edges matter.</p>
                     <p>[5] Nelson Campos. <a href="isp_uvm.html">ISP verification with UVM</a> &mdash; image-processing verification context.</p>
                     <p>[6] Nelson Campos. <a href="fifo_cdc.html">Synchronous and Asynchronous FIFOs in Hardware</a> &mdash; the CDC primitive behind video elasticity.</p>
-                    <p>[7] Nelson Campos. <a href="axi_dma.html">AXI DMA and CDMA</a> &mdash; the memory-movement foundation for the next VDMA post.</p>
+                    <p>[7] Nelson Campos. <a href="axi_dma.html">AXI DMA and CDMA</a> &mdash; the memory-movement foundation for the VDMA.</p>
                     <p>[8] Nelson Campos. <a href="axi_vip.html">Building SystemVerilog AXI VIP</a>.</p>
                     <p>[9] Nelson Campos. <a href="axi_sva.html">SVA Protocol Checkers for AXI</a>.</p>
                     <p>[10] Nelson Campos. <a href="verilator_tb.html">Verilator testbenches</a>.</p>
+                    <p>[11] Nelson Campos. <a href="vdma.html">Video DMA: triple-buffering, genlock and temporal taps</a> &mdash; the follow-up post.</p>
 
                 </div>
             </div>
